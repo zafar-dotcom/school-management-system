@@ -94,6 +94,8 @@ A new session must know what changed, or it will act on a superseded decision fo
 | 11 | Student records | School-wide, branch held on the enrolment (Revision 7) |
 | 12 | Module build order | Fixed (Revision 7) |
 | 13 | Test seed | **Changed:** two branches in dev → **one branch, matching production**, at the user's direction |
+| 14 | `SMS.Api` timing | **Changed:** deferred to phase D5 → **built now, alongside `SMS.Web`** (Revision 8). A mobile client is planned as well as WPF. The web UI stays server-rendered MVC. |
+| 15 | Per-module class libraries | **Confirmed not happening.** Modules are folders inside the layers, as §3.3 always said (Revision 8) |
 
 ### The two reversals worth understanding properly
 

@@ -4,6 +4,14 @@
 
 **Companion documents:** `SESSION_HANDOVER.md` — read first in a new session. `PROJECT_STATUS.md` — what is built, verified and outstanding right now. `Master_Schema_Design.md` — the `master` schema design.
 
+**Revision 8 — API and module structure**
+
+- **`SMS.Api` is built now, alongside `SMS.Web`**, not deferred to phase D5. A mobile client is planned in addition to WPF, so the API is known work rather than speculation; and a second consumer enforces the layering structurally (Section 11).
+- The web UI is **unchanged** — server-rendered MVC with Razor and cookie authentication. The API serves mobile and desktop.
+- **Confirmed: modules stay as folders inside the layers**, not per-module class libraries (Sections 3.3 and 11).
+- Business logic currently sits in MVC controllers and must move into `SMS.Application` before the API is added — `PROJECT_STATUS.md` §7E.
+- Data-protection keys to be encrypted with DPAPI in `SingleTenant` mode; the missing cross-schema foreign key on `class.branch_id` to be added by hand — `PROJECT_STATUS.md` §7C2.
+
 **Status:** Architecture agreed in full. **Version 1 is scoped to Model A only — a single school, a single branch, installed on one computer.** Multi-branch, LAN, multi-school, and cloud operation are designed for and deferred until there is demand; Section 1 defines the boundary and Section 9.2 the activation path.
 
 **Revision 7 — plan finalised**
@@ -909,6 +917,37 @@ Each of these is **additive** provided Section 1.3 was honoured. None requires r
 - Set up continuous integration early: build, test, and migration validation on every change.
 
 ## 11. Questions Answered and Decisions Made
+
+### Q: Should `SMS.Api` be built now, or deferred until a desktop client exists?
+
+**Decision: build it now, alongside `SMS.Web`.** This supersedes the earlier plan to defer it to phase D5.
+
+The reason is a planned mobile application in addition to the WPF desktop client. Both need a JSON API, so the API is not speculative — it is known work, and the only question was its timing.
+
+Two benefits decided it:
+
+- **A second consumer enforces the layering structurally.** With only MVC, nothing prevents business logic drifting into controllers; it keeps working until the day an API needs to reach it. With two hosts from the start, that duplication is visible immediately.
+- **The cost of the refactor rises with time.** Extracting logic from three controllers is routine; from twenty it is a rewrite.
+
+**This does not change the web UI.** `SMS.Web` remains server-rendered MVC with Razor and cookie authentication — see the next question. The API serves mobile and desktop clients.
+
+```
+Browser  ──>  SMS.Web (MVC, cookies)  ──┐
+Mobile   ──>                            ├──>  SMS.Application  ──>  Infrastructure  ──>  DB
+WPF      ──>  SMS.Api (JSON, JWT)    ──┘
+```
+
+**`SMS.Web` must never call `SMS.Api` over HTTP.** They run in the same process; routing through HTTP would add a network hop and JSON serialisation for nothing. Both reference `SMS.Application` directly. *How* an identity is persisted is host-specific — cookie sign-in versus JWT issuance — but credential validation, membership resolution and claim-building are shared and belong in the application layer.
+
+Keep the API minimal until a real client exists: a health endpoint and a small mirror of existing use cases. JWT lifetime, refresh tokens, versioning and documentation are designed when something actually consumes them.
+
+### Q: Should each functional module be its own class library?
+
+**Decision: no.** Modules are folders and namespaces inside the existing layers — `SMS.Application/Students/`, `SMS.Domain/Attendance/` — not separate projects. This confirms §3.3, which already stated it.
+
+Per-module assemblies (`SMS.Students.dll`, `SMS.Attendance.dll`) are a legitimate pattern, and their advantage is real: boundaries become compiler-enforced, so Attendance cannot reference Students without a deliberate project reference. The cost here is 15 to 21 projects for seven modules across the layers, with the build time and wiring that implies, carried by a single developer.
+
+Revisit only if module boundaries are actually being violated in practice. Project count is a poor remedy for a discipline problem that code review has not yet been asked to solve.
 
 ### Q: Should we use ASP.NET Core MVC/Razor or a separate frontend with Web API?
 

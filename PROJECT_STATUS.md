@@ -305,6 +305,36 @@ Then open `https://localhost:7106`. On a database with no school it redirects to
 > User secrets load **only in Development**. Starting without `ASPNETCORE_ENVIRONMENT` set
 > gives "ConnectionStrings:App is not configured" rather than a connection error.
 
+### C2. Two items the walking-skeleton session raised — now decided
+
+**Data-protection keys are stored unencrypted.** Anyone able to read `master.data_protection_key`, or a database backup, can forge an authentication cookie. The framework logs a warning about this.
+
+**Decision: encrypt them with DPAPI in `SingleTenant` mode.**
+
+```csharp
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<MasterDbContext>()
+    .ProtectKeysWithDpapi(protectToLocalMachine: true);   // SingleTenant only
+```
+
+This ties the keys to the machine, which is exactly right for Models A and B — one server, never moved. It does **not** suit Model C, where instances come and go, so that mode will need a cloud key store instead.
+
+This is not an `if (onPremise)` in business logic, which §7.2 of the architecture forbids. It is host configuration at the edge of the system, which the same section explicitly permits. Gate it on the deployment-mode setting alongside the other edge concerns.
+
+*Consequence to record for Model A and B:* restoring a database backup onto a **different** machine makes existing auth cookies unreadable. Everyone is signed out and signs in again. That is acceptable and much better than portable forgeable keys, but it must be in the support notes so it is not mistaken for a fault.
+
+**The missing cross-schema foreign key** from `school_main.class.branch_id` to `master.branch` — architecture §4.3 and §4.7 call for it and it is absent. That is why a row with a non-existent `branch_id` could be inserted during testing.
+
+**Decision: add it, by hand, in a migration.** EF cannot generate it because the two tables belong to different `DbContext` types; it has no way to see the relationship. Add it with `migrationBuilder.Sql(...)`, the same way the three partial unique indexes were added:
+
+```sql
+ALTER TABLE school_main.class
+    ADD CONSTRAINT fk_class_branch
+    FOREIGN KEY (branch_id) REFERENCES master.branch (id) ON DELETE RESTRICT;
+```
+
+**This is the point of choosing schema-per-school.** Under database-per-school the constraint would have been impossible and the integrity would have rested on application code forever. Here the database can enforce it, so it should. Every branch-scoped table added from now on needs the same constraint — add it to the checklist when the academic-setup module lands.
+
 ### D. Write the tests that are now missing
 
 This jumped ahead of the first feature module. Everything in section 4 was verified once, by
@@ -316,9 +346,44 @@ architecture §10 requires tests for.
 3. A test that a write takes `BranchId` from the context and ignores anything posted.
 4. A test that the schema-version check refuses a mismatch instead of serving.
 
-### E. Then the first feature module
+### E. Move the business logic into `SMS.Application`, then add `SMS.Api`
+
+**Decided this session. Do it before the first feature module, not after.**
+
+Right now `SMS.Application` contains only `IClock` and `ITenantContext`. Every use case lives inside an MVC controller — `SetupController` alone holds the whole seed: school, branch, administrator, membership, inside the cross-schema transaction.
+
+That works perfectly well for a web-only product. It does not survive a second consumer: `SMS.Api` cannot reach any of it without copying it.
+
+**1. Extract the handlers.** Roughly:
+
+```
+SMS.Application/Setup/CompleteSetupHandler.cs       ← from SetupController
+SMS.Application/Classes/ListClassesHandler.cs       ← from ClassesController
+SMS.Application/Classes/CreateClassHandler.cs
+SMS.Application/Access/AuthenticateHandler.cs       ← credentials + membership + claim set
+```
+
+Controllers become: validate input → call one handler → return a view.
+
+**The split to get right.** *How* an identity is persisted is legitimately host-specific — cookie sign-in for Web, JWT issuance for the API. That stays in each host. What is shared is validating the credentials, resolving the `SchoolMembership`, and building the claim set. Divide `AccountController` along that seam rather than down the middle.
+
+**2. Add `SMS.Api`** — minimal to start: a health endpoint and one or two endpoints mirroring what MVC already does. JWT, refresh tokens, versioning and documentation arrive when a real client needs them.
+
+```
+Browser  ──>  SMS.Web (MVC, cookies)  ──┐
+Mobile   ──>                            ├──>  SMS.Application  ──>  Infrastructure  ──>  DB
+WPF      ──>  SMS.Api (JSON, JWT)    ──┘
+```
+
+**Never have `SMS.Web` call `SMS.Api` over HTTP.** Same process — that would add a network hop and JSON serialisation for no benefit. Both reference `SMS.Application` directly.
+
+**Why now:** this is a ~400-line refactor across three controllers. At twenty controllers it stops being a refactor and becomes a rewrite. A second consumer also makes logic-in-controller visible immediately, which is the discipline that was missing while only MVC existed.
+
+### F. Then the first feature module
 
 **Academic setup** — academic year, class, section, subject. Order and prerequisites are in architecture document section 9.1. It extends the `class` table the skeleton already uses.
+
+When adding each branch-scoped table, remember the cross-schema foreign key from section C2.
 
 ---
 
