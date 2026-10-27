@@ -1,19 +1,40 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
+  <!--
+    SMS.Web — the browser host. Server-rendered MVC with Razor and cookie authentication.
+
+      May reference:      Application, Infrastructure.
+      Must not reference: Api. Not as a project reference, and not over HTTP.
+
+    That last rule is the one worth stating plainly, because the obvious-looking
+    alternative is wrong here:
+
+    SMS.Web MUST NOT call SMS.Api over HTTP. They are two hosts over the same application
+    layer, not a client and a server. Routing the website through its own API would add a
+    network hop, JSON serialisation and a second authentication mechanism inside what is,
+    in Model A, a single machine in a school. Both hosts call the handlers in
+    SMS.Application directly, in-process (architecture section 11).
+
+    (A company project you may have seen does the opposite — its admin site calls its API
+    over HTTP. That API is partner-facing, with request signing and scopes, and lives
+    across a network boundary. Different problem, different answer.)
+
+    This project is thin on purpose: controllers validate input, call one handler, and
+    render a view. If logic starts accumulating here, it belongs in Application — the API
+    will need it too.
+  -->
+
+  <PropertyGroup>
+    <UserSecretsId>4a4b251b-307d-4933-b84e-29e4e4f64e49</UserSecretsId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SMS.Application\SMS.Application.csproj" />
     <ProjectReference Include="..\SMS.Infrastructure\SMS.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>4a4b251b-307d-4933-b84e-29e4e4f64e49</UserSecretsId>
-  </PropertyGroup>
 
 </Project>

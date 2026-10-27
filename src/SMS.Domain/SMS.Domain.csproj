@@ -1,13 +1,24 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <!--
+    SMS.Domain — entities, enums and business rules. The innermost layer.
+
+      May reference:      nothing in this solution.
+      Must not reference: Application, Infrastructure, Web, Api.
+
+    No Entity Framework. Mapping lives in Infrastructure as IEntityTypeConfiguration
+    classes, never as attributes here, so the domain does not depend on how it is stored
+    (architecture 3.4 and 11).
+
+    The one framework dependency is Microsoft.Extensions.Identity.Stores, for the
+    IdentityUser<Guid> that AppUser derives from. That is Identity's *abstractions*
+    package, not the EF Core one. The alternative — an Identity user plus a mirrored
+    domain user — would trade a package reference for a synchronisation problem
+    (Master_Schema_Design section 4).
+  -->
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Stores" />
   </ItemGroup>
 
 </Project>

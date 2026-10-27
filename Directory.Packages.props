@@ -1,0 +1,63 @@
+<Project>
+
+  <!--
+    Central package management.
+
+    Every NuGet version for the whole solution is declared here, once. Project files list
+    which packages they need; they never state a version.
+
+    Why: before this file existed, Serilog.AspNetCore 10.0.0 was declared in two csproj
+    files and the 10.0.14 framework version in nine places. Upgrading meant editing five
+    files and hoping none was missed — and two projects silently running different versions
+    of the same package is the kind of fault that only shows up at runtime.
+
+    To upgrade a package, change the single line here.
+    To add one to a project:  <PackageReference Include="Name" />   (no Version attribute)
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <!--
+      Fail the build on a package with a known vulnerability, rather than printing a
+      warning nobody reads. This is what caught Microsoft.OpenApi 2.0.0 (NU1903), which
+      arrived transitively with the Web API template and was removed instead of shipped.
+    -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+  </PropertyGroup>
+
+  <ItemGroup Label="Framework — keep these on one version together">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Stores" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup Label="PostgreSQL">
+    <!--
+      The Npgsql provider and EFCore.NamingConventions version independently of the
+      framework. Check both against the EF Core major version before upgrading either.
+    -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Logging">
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Testing">
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

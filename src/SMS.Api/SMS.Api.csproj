@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    SMS.Api — the JSON host, for the planned mobile client and the WPF desktop client.
+
+      May reference:      Application, Infrastructure.
+      Must not reference: Web.
+
+    This is a sibling of SMS.Web, not a layer beneath it. Both call the same handlers in
+    SMS.Application in-process. Neither calls the other.
+
+    What legitimately differs between the two hosts is only how an identity is persisted:
+    a cookie there, a bearer token here. Everything before that point — validating
+    credentials, resolving the membership, building the claim set — is shared, in
+    SMS.Application/Access. If something new looks host-specific, check it against that
+    line before duplicating it (architecture section 11).
+
+    Request and response records carry no BranchId. A client cannot name a branch: it is
+    stamped server-side from the resolved token context (architecture section 4.6, rule 1).
+
+    Kept deliberately minimal until a real client exists. No OpenAPI package — the
+    template's pulls in Microsoft.OpenApi 2.0.0, which carries a known advisory, and
+    documentation is deferred until something actually consumes this.
+  -->
+
+  <PropertyGroup>
+    <UserSecretsId>4a4b251b-307d-4933-b84e-29e4e4f64e49</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SMS.Application\SMS.Application.csproj" />
+    <ProjectReference Include="..\SMS.Infrastructure\SMS.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+</Project>

@@ -6,6 +6,7 @@ using SMS.Application.Abstractions;
 using SMS.Infrastructure.Setup;
 using SMS.Infrastructure.Persistence;
 using SMS.Infrastructure.Persistence.Interceptors;
+using SMS.Infrastructure.Persistence.Stores;
 using SMS.Infrastructure.Tenancy;
 using SMS.Infrastructure.Time;
 
@@ -67,6 +68,13 @@ public static class DependencyInjection
         // tenant has been resolved.
         services.AddScoped<Func<SchoolDbContext>>(sp => sp.GetRequiredService<SchoolDbContext>);
         services.AddScoped<CrossSchemaTransaction>();
+
+        // The contracts the application layer declares, implemented here. This is the only
+        // place the two sides are joined — SMS.Application never references this project.
+        services.AddScoped<IMasterStore, MasterStore>();
+        services.AddScoped<ISchoolStore, SchoolStore>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<ISchemaVersionSource, SchemaVersionSource>();
 
         services.AddSingleton<InstallationState>();
         services.AddScoped<SchemaVersionCheck>();

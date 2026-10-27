@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SMS.Application.Abstractions;
 using SMS.Infrastructure.Persistence;
 using SMS.Infrastructure.Tenancy;
 
@@ -17,15 +18,18 @@ public sealed class SchemaVersionCheck
     private readonly MasterDbContext _master;
     private readonly DbContextOptions<SchoolDbContext> _schoolOptions;
     private readonly ILogger<SchemaVersionCheck> _log;
+    private readonly IClock _clock;
 
     public SchemaVersionCheck(
         MasterDbContext master,
         DbContextOptions<SchoolDbContext> schoolOptions,
-        ILogger<SchemaVersionCheck> log)
+        ILogger<SchemaVersionCheck> log,
+        IClock clock)
     {
         _master = master;
         _schoolOptions = schoolOptions;
         _log = log;
+        _clock = clock;
     }
 
     /// <summary>The newest migration this build carries for the school schema.</summary>
@@ -67,9 +71,7 @@ public sealed class SchemaVersionCheck
             // Ordered so the choice is deterministic rather than whatever the scan returns
             // first. Version 1 has one school; this is what makes that assumption explicit.
             var record = await _master.Schools
-                .AsNoTracking()
                 .OrderBy(s => s.CreatedAt)
-                .Select(s => new { s.Name, s.SchemaVersion })
                 .FirstOrDefaultAsync(ct);
 
             if (record is null)
@@ -81,15 +83,25 @@ public sealed class SchemaVersionCheck
             var expected = ExpectedSchoolSchemaVersion(school);
             if (!string.Equals(record.SchemaVersion, expected, StringComparison.Ordinal))
             {
-                // The history table says current but the school's recorded version disagrees.
-                // Trust neither: something applied a migration without updating the record,
-                // or the record was edited.
-                var detail =
-                    $"School '{record.Name}' records schema version '{record.SchemaVersion ?? "(none)"}' " +
-                    $"but this build expects '{expected}'. The migrations history and the school " +
-                    "record disagree; resolve before serving.";
-                _log.LogError("Schema version mismatch at startup. {Detail}", detail);
-                return (InstallationStatus.SchemaMismatch, detail);
+                // Reaching here means the migrations history is fully applied — that check
+                // ran above and passed — but school.schema_version still names an older
+                // migration. The history is authoritative; this column is the fast-lookup
+                // cache that architecture section 4.8 keeps beside it. So the schema is
+                // genuinely correct and the cache is simply stale.
+                //
+                // Refusing to serve would be wrong, and worse than wrong operationally:
+                // only the setup wizard ever writes this column, so the FIRST update
+                // shipped to a school would brick the install until someone edited the row
+                // by hand, on a machine with no DBA. Refresh it and carry on.
+                _log.LogWarning(
+                    "School '{School}' recorded schema version {Recorded} but the database is " +
+                    "migrated to {Expected}. The migrations history is authoritative, so the " +
+                    "record is being brought up to date.",
+                    record.Name, record.SchemaVersion ?? "(none)", expected);
+
+                record.SchemaVersion = expected;
+                record.LastMigratedAt = _clock.UtcNow;
+                await _master.SaveChangesAsync(ct);
             }
 
             _log.LogInformation(

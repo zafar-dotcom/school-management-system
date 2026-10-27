@@ -1,5 +1,5 @@
 @using System.Security.Claims
-@using SMS.Web.Tenancy
+@using SMS.Application.Access
 @{
     ViewData["Title"] = "Home";
 }
@@ -18,13 +18,13 @@
         <dd class="col-sm-8">@User.Identity!.Name</dd>
 
         <dt class="col-sm-4">Role</dt>
-        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaims.SchoolRole)</dd>
+        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaimTypes.SchoolRole)</dd>
 
         <dt class="col-sm-4">Branch scope</dt>
-        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaims.BranchScope)</dd>
+        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaimTypes.BranchScope)</dd>
 
         <dt class="col-sm-4">Active branch</dt>
-        <dd class="col-sm-8"><code>@User.FindFirstValue(SchoolClaims.ActiveBranchId)</code></dd>
+        <dd class="col-sm-8"><code>@User.FindFirstValue(SchoolClaimTypes.ActiveBranchId)</code></dd>
     </dl>
 
     <a class="btn btn-primary" asp-controller="Classes" asp-action="Index">Open classes</a>

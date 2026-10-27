@@ -1,13 +1,38 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SMS.Application — the use cases. Both hosts run these, in-process.
+
+      May reference:      Domain.
+      Must not reference: Infrastructure, Web, Api.
+
+    The Infrastructure rule is the one that matters, and it is the rule people argue with,
+    so the reason is written where the temptation lives.
+
+    A handler needs the database. The quick way to get it is a reference to Infrastructure
+    and an injected DbContext. Do not. This layer declares what it needs as interfaces —
+    IMasterStore, ISchoolStore, IUnitOfWork, ISchemaVersionSource — and Infrastructure
+    implements them. Each host wires the two together at startup.
+
+    What that buys: the use cases can be tested without a database, and a change of
+    persistence is a change in one project. What it costs: a small interface per concern.
+    These are named operations, not generic repositories — architecture section 10.
+
+    Microsoft.Extensions.Identity.Core is allowed. UserManager<T> is a framework service,
+    not infrastructure, and wrapping it would add a layer of ceremony around something the
+    web host and the API both already depend on.
+
+    Deployment mode (SingleTenant / MultiTenant) must never be read here. Grepping this
+    project and Domain for it should return nothing — architecture section 8.
+  -->
 
   <ItemGroup>
     <ProjectReference Include="..\SMS.Domain\SMS.Domain.csproj" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
+  </ItemGroup>
 
 </Project>

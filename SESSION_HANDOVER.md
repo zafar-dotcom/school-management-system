@@ -38,7 +38,7 @@ Everything needed to continue is in those five files. Nothing from the previous 
 |---|---|
 | **`SESSION_HANDOVER.md`** (this file) | Starting a new session — gives you the whole picture |
 | `PROJECT_STATUS.md` | You need the current build state and next actions |
-| `School_Management_System_Architecture_and_Decisions.md` | You need a decision and its reasoning. Revision 7 |
+| `School_Management_System_Architecture_and_Decisions.md` | You need a decision and its reasoning. Revision 8 |
 | `Master_Schema_Design.md` | You are working on the database |
 | `HOW_TO_VERIFY.md` | You want to confirm something is actually correct — connections, migrations, permissions, tables |
 

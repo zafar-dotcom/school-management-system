@@ -1,30 +1,34 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using SMS.Domain.Common;
+using SMS.Application.Access;
 using SMS.Domain.Master;
-using SMS.Infrastructure.Persistence;
 using SMS.Web.Models;
-using SMS.Web.Tenancy;
 
 namespace SMS.Web.Controllers;
 
+/// <summary>
+/// Cookie sign-in for the browser.
+/// <para>
+/// Credential validation, lockout and membership resolution live in
+/// <see cref="AuthenticateHandler"/>, shared with the API. What stays here is the one
+/// genuinely host-specific part: writing the identity into a cookie. The API writes a token
+/// from the same handler's result — architecture section 11.
+/// </para>
+/// </summary>
 public class AccountController : Controller
 {
+    private readonly AuthenticateHandler _authenticate;
     private readonly SignInManager<AppUser> _signIn;
-    private readonly UserManager<AppUser> _users;
-    private readonly MasterDbContext _master;
     private readonly ILogger<AccountController> _log;
 
     public AccountController(
+        AuthenticateHandler authenticate,
         SignInManager<AppUser> signIn,
-        UserManager<AppUser> users,
-        MasterDbContext master,
         ILogger<AccountController> log)
     {
+        _authenticate = authenticate;
         _signIn = signIn;
-        _users = users;
-        _master = master;
         _log = log;
     }
 
@@ -42,62 +46,27 @@ public class AccountController : Controller
     [AllowAnonymous]
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoginViewModel model)
+    public async Task<IActionResult> Login(LoginViewModel model, CancellationToken ct)
     {
         if (!ModelState.IsValid)
             return View(model);
 
-        var user = await _users.FindByEmailAsync(model.Email.Trim());
-
-        // One message for every failure. Saying "no such account" tells an attacker which
-        // email addresses are real.
-        const string failed = "That email address and password do not match an account.";
-
-        if (user is null)
-        {
-            ModelState.AddModelError(string.Empty, failed);
-            return View(model);
-        }
-
-        if (user.Status != UserStatus.Active)
-        {
-            _log.LogWarning("Sign-in refused for {UserId}: account status is {Status}.", user.Id, user.Status);
-            ModelState.AddModelError(string.Empty,
-                "This account is not active. Contact your school administrator.");
-            return View(model);
-        }
-
-        var result = await _signIn.PasswordSignInAsync(
-            user, model.Password, model.RememberMe, lockoutOnFailure: true);
-
-        if (result.IsLockedOut)
-        {
-            ModelState.AddModelError(string.Empty,
-                "This account is locked after too many attempts. Try again later.");
-            return View(model);
-        }
+        var result = await _authenticate.HandleAsync(
+            new AuthenticateCommand(model.Email, model.Password), ct);
 
         if (!result.Succeeded)
         {
-            ModelState.AddModelError(string.Empty, failed);
+            foreach (var error in result.Errors)
+                ModelState.AddModelError(string.Empty, error);
+
             return View(model);
         }
 
-        // Authentication succeeded, but a login with no active membership has no school and
-        // no branch, so it cannot reach anything. Signing out here gives a clear message
-        // instead of a confusing redirect loop at tenant resolution.
-        var membership = await SchoolClaimsPrincipalFactory.ActiveMembershipAsync(_master, user.Id);
-        if (membership is null
-            || await SchoolClaimsPrincipalFactory.ActiveBranchIdAsync(_master, membership) is null)
-        {
-            await _signIn.SignOutAsync();
-            _log.LogWarning("Signed {UserId} back out: no active membership or no reachable branch.", user.Id);
-            ModelState.AddModelError(string.Empty,
-                "This account has no active access to a school. Contact your school administrator.");
-            return View(model);
-        }
+        // The claim set is rebuilt by the claims factory during sign-in, so it is not
+        // passed across — see SchoolClaimsPrincipalFactory.
+        await _signIn.SignInAsync(result.Value.User, model.RememberMe);
 
-        _log.LogInformation("User {UserId} signed in.", user.Id);
+        _log.LogInformation("User {UserId} signed in.", result.Value.User.Id);
 
         return Redirect(SafeReturnUrl(model.ReturnUrl));
     }

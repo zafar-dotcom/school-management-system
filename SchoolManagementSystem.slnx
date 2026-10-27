@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SMS.Api/SMS.Api.csproj" />
     <Project Path="src/SMS.Application/SMS.Application.csproj" />
     <Project Path="src/SMS.Domain/SMS.Domain.csproj" />
     <Project Path="src/SMS.Infrastructure/SMS.Infrastructure.csproj" />

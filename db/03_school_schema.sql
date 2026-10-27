@@ -55,3 +55,23 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM school_main.__ef_migrations_history WHERE "migration_id" = '20261027093533_AddClassBranchForeignKey') THEN
+    ALTER TABLE school_main.class
+        ADD CONSTRAINT fk_class_branch
+        FOREIGN KEY (branch_id) REFERENCES master.branch (id) ON DELETE RESTRICT;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM school_main.__ef_migrations_history WHERE "migration_id" = '20261027093533_AddClassBranchForeignKey') THEN
+    INSERT INTO school_main.__ef_migrations_history (migration_id, product_version)
+    VALUES ('20261027093533_AddClassBranchForeignKey', '10.0.14');
+    END IF;
+END $EF$;
+COMMIT;
+

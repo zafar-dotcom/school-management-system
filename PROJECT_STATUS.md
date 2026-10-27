@@ -1,6 +1,6 @@
 # Project Status
 
-**Last updated:** 27 October 2026 — walking skeleton complete
+**Last updated:** 27 October 2026 — walking skeleton, then logic extracted to `SMS.Application` and `SMS.Api` added
 **Purpose:** Where the project actually stands — what is built, what is verified, what is not started, and what to do next.
 
 > Starting a new session? Read `SESSION_HANDOVER.md` first — it covers the whole picture including why decisions were made and what reversed.
@@ -10,7 +10,7 @@ This is the living progress document. The others change rarely:
 | Document | What it is |
 |---|---|
 | `SESSION_HANDOVER.md` | The whole picture, decisions and what reversed. Read first in a new session. |
-| `School_Management_System_Architecture_and_Decisions.md` | Decisions and why. Revision 7. |
+| `School_Management_System_Architecture_and_Decisions.md` | Decisions and why. Revision 8. |
 | `Master_Schema_Design.md` | The `master` schema design and its reasoning. |
 | `HOW_TO_VERIFY.md` | How to check anything is correct — connections, migrations, permissions, tables. |
 | **`PROJECT_STATUS.md`** (this file) | Current state and next actions. |
@@ -19,9 +19,9 @@ This is the living progress document. The others change rarely:
 
 ## 1. Where we are in one paragraph
 
-**The walking skeleton is complete.** The application starts, checks its schema, runs a first-time setup wizard, signs a user in, and serves a branch-filtered screen that proves the isolation mechanism end to end. A .NET 10 solution with six projects compiles clean with zero warnings. The `master` and `school_main` schemas exist in a local PostgreSQL 18 database, created by EF Core migrations, with a two-role permission model that has been tested and holds.
+**The walking skeleton is complete, and it now runs behind two hosts.** The application starts, checks its schema, runs a first-time setup wizard, signs a user in, and serves a branch-filtered screen that proves the isolation mechanism end to end. The use cases live in `SMS.Application`; `SMS.Web` serves them as server-rendered MVC with cookies and `SMS.Api` serves them as JSON with JWT, both in-process. A .NET 10 solution with seven projects compiles clean with zero warnings. The `master` and `school_main` schemas exist in a local PostgreSQL 18 database, created by EF Core migrations, with a two-role permission model that has been tested and holds.
 
-Still missing above that line: any automated test, licence enforcement, the installer, and every feature module. The next step is the first feature module, academic setup.
+Still missing above that line: any automated test, licence enforcement, the installer, and every feature module. The next step is the tests in section 7D, then the first feature module.
 
 **Scope reminder:** version 1 is **one school, one branch, one computer** (Model A). Multi-branch, LAN, multi-school and cloud are deferred — architecture document sections 1.1 to 1.3.
 
@@ -31,7 +31,7 @@ Still missing above that line: any automated test, licence enforcement, the inst
 
 | Thing | Value |
 |---|---|
-| Application URL | `https://localhost:7106` (and `http://localhost:5149`) |
+| Application URLs | Web `https://localhost:7106` · API `https://localhost:7286` |
 | .NET SDK | 10.0.300 |
 | EF Core | 10.0.14 |
 | Npgsql provider | 10.0.3 |
@@ -91,11 +91,13 @@ D:\myprojectt\
 ├── SchoolManagementSystem.slnx
 ├── src\
 │   ├── SMS.Domain\          entities, enums — no EF Core reference
-│   ├── SMS.Application\     ITenantContext, IClock
+│   ├── SMS.Application\     use cases: Access, Setup, Classes — plus the store
+│   │                        contracts. No reference to SMS.Infrastructure
 │   ├── SMS.Infrastructure\  DbContexts, configurations, migrations, interceptor,
-│   │   │                    tenancy, clock, startup schema check, DI entry point
+│   │   │                    tenancy, clock, startup schema check, stores, DI
 │   │   └── secrets.example.json   template only — no real values
-│   └── SMS.Web\             MVC: setup wizard, login, class list, both middlewares
+│   ├── SMS.Web\             MVC host: setup wizard, login, class list, cookies
+│   └── SMS.Api\             JSON host for mobile and WPF: JWT, same handlers
 ├── tests\
 │   ├── SMS.UnitTests\       empty
 │   └── SMS.IntegrationTests\ empty
@@ -110,7 +112,39 @@ D:\myprojectt\
 └── Master_Schema_Design.md
 ```
 
-Project references follow the Clean Architecture rule: `Application` → `Domain`; `Infrastructure` → `Application`; `Web` → both. **`Application` does not reference `Infrastructure`.**
+Project references follow the Clean Architecture rule: `Application` → `Domain`;
+`Infrastructure` → `Application`; `Web` and `Api` → both.
+**`Application` does not reference `Infrastructure`.**
+
+**Each rule is now written as a comment at the top of the `.csproj` it governs**, with the
+reasoning. A markdown file nobody has open while adding a project reference does not stop
+the reference being added; a comment where the temptation lives has a chance. Borrowed
+from the `psp-admin-api` company project, which does the same with numbered rule ids.
+
+### Build configuration — two files at the repository root
+
+| File | What it does |
+|---|---|
+| `Directory.Packages.props` | **Central package management.** Every NuGet version for the solution, declared once. Project files list packages with no `Version` attribute |
+| `Directory.Build.props` | `net10.0`, `Nullable`, `ImplicitUsings` and `TreatWarningsAsErrors` for every project, inherited automatically |
+
+Before this, `Serilog.AspNetCore` 10.0.0 was declared in two project files and the
+`10.0.14` framework version in nine places — one upgrade meant editing five files and
+hoping none was missed.
+
+**Zero warnings is now enforced, not just a habit.** `TreatWarningsAsErrors` is on and was
+verified by compiling a deliberate CS0169 and confirming the build failed. The single
+exception is NuGet audit (`NU19xx`), which stays a warning: a new advisory can be published
+against a package we already ship, overnight, and that must be loud without blocking an
+unrelated hotfix build.
+
+```
+Browser  ──>  SMS.Web (MVC, cookies)  ──┐
+Mobile   ──>                            ├──>  SMS.Application  ──>  SMS.Infrastructure  ──>  DB
+WPF      ──>  SMS.Api (JSON, JWT)    ──┘
+```
+
+**`SMS.Web` never calls `SMS.Api` over HTTP.** Same process, same handlers, called directly.
 
 ### Domain (`SMS.Domain`)
 
@@ -145,16 +179,34 @@ Project references follow the Clean Architecture rule: `Application` → `Domain
 - `Setup/InstallationState` and `Setup/SchemaVersionCheck` — the startup gate
 - `DependencyInjection.AddInfrastructure` — the single registration point
 
+### Application (`SMS.Application`)
+
+The use cases, shared by both hosts. No reference to `SMS.Infrastructure`.
+
+- `Abstractions/` — `IClock`, `ITenantContext`, plus `IMasterStore`, `ISchoolStore`, `IUnitOfWork`, `ISchemaVersionSource`
+- `Common/Result` — success or a list of errors, so ordinary failures are not exceptions
+- `Access/AuthenticateHandler` — credentials, lockout, membership. Does **not** sign anyone in
+- `Access/ResolveTenantHandler` — the per-request validation rules, shared by cookie and token
+- `Access/BuildClaimSetHandler`, `SchoolClaimSet`, `SchoolClaimTypes` — the claim set both hosts emit
+- `Access/IdentityPolicy` — password and lockout rules, so the two hosts cannot drift
+- `Setup/CompleteSetupHandler` — the whole first-run seed, in one transaction
+- `Classes/ListClassesHandler`, `Classes/CreateClassHandler`
+
 ### Web (`SMS.Web`)
 
-- `Program.cs` — Serilog, Identity, cookies, data protection, pipeline order
-- `Tenancy/SchoolClaims` — the five claim types carrying session context
-- `Tenancy/SchoolClaimsPrincipalFactory` — adds school, branch, role and membership-version claims at sign-in
+- `Program.cs` — Serilog, Identity, cookies, DPAPI-protected keys, pipeline order
+- `Tenancy/SchoolClaimsPrincipalFactory` — writes the shared claim set into the cookie
 - `Tenancy/InstallationGateMiddleware` — 503 maintenance page, or redirect to setup
-- `Tenancy/TenantResolutionMiddleware` — re-validates every claim against `master` on each request
-- `Controllers/SetupController` — first-run wizard, one transaction
-- `Controllers/AccountController` — login, logout, denied
-- `Controllers/ClassesController` — the branch-filtered list and the server-set write path
+- `Tenancy/TenantResolutionMiddleware` — reads cookie claims, calls `ResolveTenantHandler`, signs out on refusal
+- `Controllers/` — `Setup`, `Account`, `Classes`. Thin: validate, call one handler, return a view
+
+### Api (`SMS.Api`)
+
+- `Program.cs` — Serilog, JWT bearer, the same schema check, minimal endpoints
+- `Auth/JwtOptions`, `SigningKeyProvider`, `JwtTokenIssuer` — writes the shared claim set into a token
+- `Tenancy/ApiTenantResolutionMiddleware` — same handler as the web host; refuses with 401 JSON instead of a redirect
+- `Contracts/` — request and response records. **No `BranchId` on any of them, by design**
+- Endpoints: `GET /health`, `POST /auth/token`, `GET /classes`, `POST /classes`
 
 ### Database — applied and verified
 
@@ -200,6 +252,19 @@ Driven over HTTP against the live database, not reasoned about:
 - **Anonymous access is refused** — `/Classes` redirects to the login page with a return URL.
 
 > **On that filter test.** `Master_Schema_Design.md` section 7 records that version 1 cannot exercise the branch filter because there is only one branch. That is true of the *seed*, but the filter itself can be tested by inserting a foreign `branch_id` directly, which is what was done above. It does not replace the two-branch test required at the start of phase D2 — that one also covers branch switching, scope and the widened-scope service — but the filter predicate itself is no longer unproven.
+>
+> That particular insert **no longer works**, because the cross-schema foreign key from
+> section 7C2 now rejects it. Repeating the test means inserting a real second branch row
+> first — which is the phase D2 test anyway.
+
+### Verified after the §7C2 and §7E work, 27 October 2026
+
+- **The cross-schema foreign key holds.** The exact insert that slipped through during the filter test above is now rejected: *insert or update on table "class" violates foreign key constraint "fk_class_branch"*. The constraint reads `FOREIGN KEY (branch_id) REFERENCES master.branch(id) ON DELETE RESTRICT`.
+- **The web host still works after the refactor** — login, the class list, creating a class, and the duplicate-code rejection, all through the extracted handlers.
+- **The API works against the same handlers.** `GET /health` anonymous; `GET /classes` is 401 without a token and returns the branch-filtered list with one; `POST /auth/token` returns a bearer token and 401s on a wrong password with the same wording the website uses.
+- **`BranchId` cannot be supplied by an API client.** A `POST /classes` body carrying an extra `"branchId"` for a non-existent branch was accepted and the row still landed on Main — the field is simply not on the contract, so it is discarded. Architecture §4.6 rule 1 holds on the API surface, not only on the web form.
+- **Revocation applies identically to a token.** A token minted at one `membership_version` was rejected with `401 {"error":"context_invalid","detail":"membership has changed since sign-in"}` after the membership changed. Same `ResolveTenantHandler` as the cookie path — which is the point of having extracted it.
+- **The schema-version cache self-heals.** See the note in section 6, gotcha 16.
 
 ---
 
@@ -253,6 +318,9 @@ Each of these cost time and will recur on another machine or another developer's
 | 13 | Naming a namespace `Installation` shadows the `Installation` entity and breaks the build — **gotcha 2 all over again**, in a new place | The namespace is `SMS.Infrastructure.Setup`. Before naming any namespace, check it is not also an entity name: `School`, `Installation`, `License`, `Branch` are all taken |
 | 14 | **The password scan in `HOW_TO_VERIFY.md` §8 never ran.** `Select-String` has no `-Include` or `-Recurse`; it threw, the result was empty, and the check reported "clean" without looking. A pre-commit safety check that fails open is worse than none | Filter with `Get-ChildItem` first, then pipe into `Select-String`. Corrected in §8 |
 | 15 | Testing cookie expiry or revocation with `curl -b` alone is misleading: re-sending the *original* cookie every time means Identity's security-stamp interval has always elapsed, so it refreshes the principal from the database on every request and any staleness you were trying to test disappears | Use `-b` and `-c` on the same cookie jar so the refreshed cookie is kept, then change the data and request again |
+| 16 | **Nothing updated `school.schema_version` after the initial setup.** Only the setup wizard wrote it, so adding the second school-schema migration made the startup check refuse to serve — and on a customer's machine the *first* update shipped would have bricked the install until someone edited the row by hand, with no DBA on site | The migrations history is authoritative and is checked first. If it is fully applied but the column is stale, the check now refreshes the column and logs a warning instead of refusing. It still refuses outright when migrations are genuinely pending |
+| 17 | `dotnet new webapi` brings `Microsoft.AspNetCore.OpenApi`, which pulls `Microsoft.OpenApi` 2.0.0 — a package with a known high-severity advisory (NU1903) | Removed. API documentation is deferred until a real client needs it (architecture §11), so there was nothing to weigh against shipping a known vulnerability |
+| 18 | A stray `SMS.Web` process keeps `bin\` locked and the next build fails with MSB3027. `Stop-Process -Name dotnet` does not catch it — the run spawns a child named after the project | `Get-Process SMS.Web,SMS.Api \| Stop-Process -Force` before rebuilding |
 
 ---
 
@@ -305,7 +373,7 @@ Then open `https://localhost:7106`. On a database with no school it redirects to
 > User secrets load **only in Development**. Starting without `ASPNETCORE_ENVIRONMENT` set
 > gives "ConnectionStrings:App is not configured" rather than a connection error.
 
-### C2. Two items the walking-skeleton session raised — now decided
+### C2. ✅ Two items the walking-skeleton session raised — DECIDED AND DONE
 
 **Data-protection keys are stored unencrypted.** Anyone able to read `master.data_protection_key`, or a database backup, can forge an authentication cookie. The framework logs a warning about this.
 
@@ -346,9 +414,46 @@ architecture §10 requires tests for.
 3. A test that a write takes `BranchId` from the context and ignores anything posted.
 4. A test that the schema-version check refuses a mismatch instead of serving.
 
-### E. Move the business logic into `SMS.Application`, then add `SMS.Api`
+### E. ✅ Move the business logic into `SMS.Application`, then add `SMS.Api` — DONE
 
-**Decided this session. Do it before the first feature module, not after.**
+Both halves are built and were verified by running the two hosts against the live database.
+What follows is the original plan; section 4 records what the finished work actually proves.
+
+**What the handlers turned out to be:**
+
+```
+SMS.Application/Access/AuthenticateHandler.cs     credentials, lockout, membership
+SMS.Application/Access/ResolveTenantHandler.cs    the per-request validation rules
+SMS.Application/Access/BuildClaimSetHandler.cs    school + branch + role claims
+SMS.Application/Access/SchoolClaimTypes.cs        the five claim names, shared
+SMS.Application/Access/IdentityPolicy.cs          password and lockout rules, shared
+SMS.Application/Setup/CompleteSetupHandler.cs     the whole first-run seed
+SMS.Application/Classes/ListClassesHandler.cs
+SMS.Application/Classes/CreateClassHandler.cs
+```
+
+`ResolveTenantHandler` and `IdentityPolicy` were not in the original list and are the two
+that mattered most: without them the API would have carried its own copy of the tenant
+validation rules and its own password policy, free to drift from the website's.
+
+**The layering rule held.** `SMS.Application` still does not reference `SMS.Infrastructure`.
+It declares `IMasterStore`, `ISchoolStore`, `IUnitOfWork` and `ISchemaVersionSource`;
+`SMS.Infrastructure/Persistence/Stores/` implements them; each host wires them up. These are
+named operations, not generic repositories — architecture §10.
+
+> **`SMS.Api` ports:** `https://localhost:7286`. Run it the same way as the website, with
+> `ASPNETCORE_ENVIRONMENT=Development`.
+>
+> **`Jwt:SigningKey` must be configured outside Development** — the API refuses to start
+> without it. In Development it generates an ephemeral key and logs a warning; tokens then
+> stop working whenever the process restarts.
+>
+> **No OpenAPI package.** The template's `Microsoft.AspNetCore.OpenApi` pulls in
+> `Microsoft.OpenApi` 2.0.0, which carries a known high-severity advisory (NU1903). It was
+> removed rather than shipped — API documentation is deferred until a real client needs it
+> anyway (architecture §11).
+
+#### The original plan, for reference
 
 Right now `SMS.Application` contains only `IClock` and `ITenantContext`. Every use case lives inside an MVC controller — `SetupController` alone holds the whole seed: school, branch, administrator, membership, inside the cross-schema transaction.
 

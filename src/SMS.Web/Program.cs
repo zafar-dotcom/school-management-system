@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using SMS.Domain.Master;
+using SMS.Application;
+using SMS.Application.Access;
 using SMS.Infrastructure;
 using SMS.Infrastructure.Persistence;
 using SMS.Infrastructure.Setup;
@@ -22,6 +24,9 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30));
 
+// Use cases, shared with SMS.Api — both hosts run them in-process.
+builder.Services.AddApplication();
+
 // Persistence, tenant context, clock, audit interceptor, schema check.
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -30,20 +35,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // (architecture s5.2). MasterDbContext derives from IdentityUserContext, so the role tables
 // do not exist to be read even by mistake.
 builder.Services
-    .AddIdentityCore<AppUser>(options =>
-    {
-        options.User.RequireUniqueEmail = true;
-        options.SignIn.RequireConfirmedAccount = false;
-
-        options.Password.RequiredLength = 12;
-        options.Password.RequireDigit = true;
-        options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = true;
-
-        options.Lockout.MaxFailedAccessAttempts = 5;
-        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
-    })
+    .AddIdentityCore<AppUser>(IdentityPolicy.Configure)
     .AddEntityFrameworkStores<MasterDbContext>()
     .AddClaimsPrincipalFactory<SchoolClaimsPrincipalFactory>()
     .AddSignInManager()
@@ -72,9 +64,27 @@ builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 
 // Keys in the database, not on disk: cookies then survive a reinstall, and a second
 // instance is already handled — architecture s8.
-builder.Services.AddDataProtection()
+var dataProtection = builder.Services.AddDataProtection()
     .PersistKeysToDbContext<MasterDbContext>()
     .SetApplicationName("SchoolManagementSystem");
+
+// Deployment mode is read here, at the edge, and nowhere else. Architecture s7.2 forbids
+// an "if (onPremise)" inside domain or application logic but explicitly allows host
+// configuration to vary — this is that.
+var singleTenant = string.Equals(
+    builder.Configuration["Deployment:Mode"], "SingleTenant", StringComparison.OrdinalIgnoreCase);
+
+if (singleTenant && OperatingSystem.IsWindows())
+{
+    // Unencrypted keys in the database mean anyone who can read master.data_protection_key
+    // — or a backup of it — can forge an authentication cookie. DPAPI ties them to this
+    // machine, which is exactly right for Models A and B: one server, never moved.
+    //
+    // Consequence for support: restoring a backup onto a DIFFERENT machine makes existing
+    // cookies unreadable, so everyone is signed out once and signs in again. That is
+    // expected behaviour, not a fault. Model C needs a cloud key store instead.
+    dataProtection.ProtectKeysWithDpapi(protectToLocalMachine: true);
+}
 
 builder.Services.AddControllersWithViews();
 

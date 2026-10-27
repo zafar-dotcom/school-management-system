@@ -1,0 +1,38 @@
+<Project>
+
+  <!--
+    Settings that apply to every project in the solution, declared once.
+
+    MSBuild imports this automatically for any project underneath this folder, so a new
+    project picks these up without being told. Anything genuinely project-specific
+    (UserSecretsId, the SDK) still belongs in the individual csproj.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--
+      Zero warnings has been the standard on this project from the first commit, but until
+      now it was a habit someone had to keep. This makes the build enforce it.
+
+      If a warning is genuinely acceptable, suppress that specific code with a comment
+      explaining why — do not turn this off.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!--
+      One exception: NuGet audit findings (NU19xx) stay warnings rather than errors.
+      A new advisory can be published against a package we already ship, overnight, with
+      no change on our side. That must be loud — but it must not block an unrelated
+      hotfix build at the moment we most need to ship one. Treat one appearing as work to
+      schedule immediately, not as something to wave through.
+    -->
+    <WarningsNotAsErrors>NU1900;NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
+</Project>
