@@ -299,6 +299,20 @@ This now comes before feature work. Everything above was verified once, by hand,
 stops it regressing — and these are the behaviours architecture §10 requires tests for.
 `PROJECT_STATUS.md` §7D lists the four.
 
+### The user interface is deliberately unstyled until then
+
+The screens are stock Bootstrap with no design applied. That is a decision, not an
+oversight: the class list exists to prove the branch filter and prints a raw branch GUID to
+do it. Design work waits for academic setup, when there are four or five screens that
+resemble the real product — and for the two open decisions it depends on, target market and
+visual/accessibility requirements (architecture §12).
+
+**Eleven constraints are recorded in `PROJECT_STATUS.md` §7G** and need reading before any
+UI work starts. The ones most likely to be forgotten: **no CDN — every asset local**,
+because a school server may have no internet; **printing is a first-class requirement**,
+because the licence read-only state preserves it; and **the maintenance page must stay
+dependency-free**, because it renders when the database is unreachable.
+
 ### Then: the first feature module
 
 **Academic setup** — academic year, class, section, subject. It is first because everything else references it, it is small, and it extends the `class` table that already exists.

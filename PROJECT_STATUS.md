@@ -490,6 +490,45 @@ WPF      ──>  SMS.Api (JSON, JWT)    ──┘
 
 When adding each branch-scoped table, remember the cross-schema foreign key from section C2.
 
+### G. The user interface — deliberately deferred to the academic-setup module
+
+**Decided 27 October 2026.** The screens built so far are stock Bootstrap 5 with no design
+applied. That is a scaffold, not an oversight, and it stays that way until academic setup.
+
+**Why wait:** the class list exists to prove the branch filter, not to be a product screen —
+it prints a raw branch GUID in a column for exactly that reason. Designing against one
+proof-of-concept screen means redoing it. Academic setup produces four or five screens that
+resemble the real product, and both open decisions that bear on this — **target market and
+country**, and **visual design and accessibility requirements** (architecture §12) — are
+still unresolved. Choosing a palette and typography before knowing who buys this is
+throwaway work.
+
+**Remove when the class screen becomes real:** the `Branch` column showing a GUID, and the
+explanatory note under the form. Both are scaffolding that proved a point and should not
+ship.
+
+#### Constraints to design within — the product runs in a browser on the school's own machine
+
+These follow from Model A and are not negotiable later without rework.
+
+| # | Constraint | Why |
+|---|---|---|
+| 1 | **No CDN. Every asset local.** No CDN Bootstrap, no Google Fonts, no remote icon packs, no analytics or telemetry scripts | A school's server may have no internet at all, and an asset that 404s offline takes the page's layout with it. Bootstrap and jQuery are already served from `wwwroot/lib` — keep it that way |
+| 2 | **System font stack, not web fonts** | Nothing to download, nothing to licence, no flash of unstyled text on a slow machine |
+| 3 | **Design for a desktop office PC first** | Model A is one computer; Model B adds other office PCs. Phones get a native client through `SMS.Api` later, so the website does not need to be mobile-first — but it should not break if someone opens it on a tablet |
+| 4 | **Printing is a first-class requirement, not an afterthought** | Report cards, fee receipts and class lists are printed. The licence `read_only` state explicitly preserves "view, search, print, export" (Master_Schema_Design §3.8) — so a print stylesheet must exist and must work when everything else is locked |
+| 5 | **Licence state needs visible UI** | Four states need treatment: `expiring` (warning banner), `grace` (prominent full-width warning), `read_only` (every create/edit control hidden or disabled, with the reason stated), `invalid` (same, plus contact support). §3.8 rule 5 requires the state and its reason always be visible to a School Admin |
+| 6 | **Design the header so a branch switcher is additive** | It currently shows a branch GUID — that should become the branch *name*. Phase D2 drops a branch selector into the same spot. Leaving room now costs nothing |
+| 7 | **The maintenance page must stay dependency-free** | `InstallationGateMiddleware` returns plain text today. It renders precisely when the schema is wrong or the database is unreachable, so it must not depend on a layout, a view engine, or anything read from the database. Style it with inline CSS only, or leave it as text |
+| 8 | **Keep `asp-append-version`** | The installer replaces files in place during an upgrade. Without a content hash in the URL, a school's browser serves last version's cached CSS against this version's markup |
+| 9 | **Decide the minimum browser** | Architecture §12 lists supported Windows versions as open; the browser question rides along with it. An old Edge on a school PC is a real possibility |
+| 10 | **Accessibility level is still unresolved** | Architecture §12. Decide before the design is built, not after — retrofitting contrast ratios and keyboard navigation is far more expensive than designing with them |
+| 11 | **Never put student data in a URL** | Already a rule (architecture §8, opaque identifiers), but it constrains how screens are routed and linked |
+
+**Effort when it happens:** roughly half a day for a working layout — brand bar, navigation,
+consistent page headers, a reusable table and form style, validation presentation, empty
+states. Two to three days if a real visual identity is wanted on top.
+
 ---
 
 ## 8. Useful commands
