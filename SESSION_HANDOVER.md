@@ -9,30 +9,37 @@
 Copy the block below as the first message of the new session:
 
 ```
-Project: School Management System, at D:\myprojectt
+Project: School Management System.
 
-Read these five files before doing anything, in this order:
+Read these six files before doing anything, in this order:
   1. SESSION_HANDOVER.md       - the whole picture, decisions and reversals
-  2. PROJECT_STATUS.md         - what is built, verified, and outstanding
+  2. PROJECT_STATUS.md         - what is built, verified, and pending
   3. School_Management_System_Architecture_and_Decisions.md  - decisions and why
   4. Master_Schema_Design.md   - the master schema
   5. HOW_TO_VERIFY.md          - how to check anything is correct
+  6. SETUP_NEW_MACHINE.md      - only if this machine is not set up yet
 
 Then confirm back to me, briefly:
   - what is already built
-  - that nothing is outstanding, and what the next six steps are
+  - what is pending, and what you would do next
 
-Do not re-open decisions already recorded as closed.
+Do not re-open decisions already recorded as closed - see section 4 of the
+handover for the full list, including what reversed.
+
 Two standing rules: this project only ever touches the LOCAL PostgreSQL
 (verify with SELECT inet_server_addr(), must be ::1 or 127.0.0.1), and the
 structures listed in section 6 of the handover must not be removed.
 ```
 
-Everything needed to continue is in those five files. Nothing from the previous conversation is required.
+Everything needed to continue is in those six files. Nothing from any previous conversation is required.
+
+**On a machine that has never run this project**, start with `SETUP_NEW_MACHINE.md` — it
+takes you from a bare Windows laptop to a running application in eleven steps, with a check
+after each one. The other five documents assume the machine is already working.
 
 ---
 
-## 1. How to use these five documents
+## 1. How to use these six documents
 
 | Document | Read it when |
 |---|---|
@@ -41,6 +48,7 @@ Everything needed to continue is in those five files. Nothing from the previous 
 | `School_Management_System_Architecture_and_Decisions.md` | You need a decision and its reasoning. Revision 9 |
 | `Master_Schema_Design.md` | You are working on the database |
 | `HOW_TO_VERIFY.md` | You want to confirm something is actually correct — connections, migrations, permissions, tables |
+| `SETUP_NEW_MACHINE.md` | This machine has never run the project. Bare laptop to running app, with a check after each step |
 
 Order for a cold start: this file → `PROJECT_STATUS.md` → the others as needed.
 
@@ -48,18 +56,29 @@ Order for a cold start: this file → `PROJECT_STATUS.md` → the others as need
 
 ---
 
-## 2. What this session achieved
+## 2. What has been achieved, across two working sessions
 
-The session began with a single architecture document and an empty folder. It ended with:
+**Session 1 — architecture and the data layer.** Began with a single architecture document
+and an empty folder. Ended with a reviewed architecture (seven revisions, every version-1
+decision closed), a complete `master` schema design, a six-project .NET 10 solution
+compiling clean, a live PostgreSQL database with both schemas created by EF Core
+migrations, and a verified two-role security model. The data layer worked; nothing above it
+existed.
 
-- A reviewed, revised architecture — seven revisions, every version-1 decision closed
-- A complete `master` schema design
-- A built .NET 10 solution: six projects, compiling clean, zero warnings
-- A live PostgreSQL database with both schemas created by EF Core migrations
-- A verified two-role security model
-- Five documents
+**Session 2 — the walking skeleton, then two hosts.** The application now starts, checks
+its own schema, sets itself up on first run, signs a user in, and serves a branch-filtered
+screen. The use cases were then lifted out of the controllers into `SMS.Application`, and
+`SMS.Api` was added beside `SMS.Web` so a future mobile and desktop client have somewhere
+to call. Seven projects, still zero warnings — and warnings are now build errors.
 
-**The project is at the end of its foundation phase.** The data layer exists and works. Nothing above it does.
+Also in session 2: two decided items implemented (DPAPI-protected keys, the cross-schema
+foreign key), central package management adopted, five further decisions closed (market,
+language, academic calendar, branding, accessibility), and three real faults found and
+fixed — see section 10.
+
+**Where that leaves it:** the foundation is complete and exercised end to end. **No
+automated tests exist**, and that is now the single largest gap. No licence enforcement, no
+installer, and no feature module.
 
 ---
 
@@ -190,19 +209,31 @@ Decided this session. Full detail in `Master_Schema_Design.md` §3.6–3.8.
 ## 8. What was built
 
 ```
-D:\myprojectt\
+<repo root>\
+├── Directory.Packages.props    every NuGet version, declared once
+├── Directory.Build.props       net10.0, Nullable, warnings-as-errors
 ├── SchoolManagementSystem.slnx
 ├── src\
 │   ├── SMS.Domain\          12 entity files, enums, base types — no EF reference
-│   ├── SMS.Application\     ITenantContext, IClock
-│   ├── SMS.Infrastructure\  2 DbContexts, 10 configurations, interceptor, 2 migrations
-│   └── SMS.Web\             MVC template, not yet wired
-├── tests\                   both empty
+│   ├── SMS.Application\     use cases: Access, Setup, Classes, plus the store
+│   │                        contracts. Does NOT reference Infrastructure
+│   ├── SMS.Infrastructure\  2 DbContexts, 11 configurations, interceptor,
+│   │                        tenancy, clock, schema check, stores, 4 migrations
+│   ├── SMS.Web\             MVC host — setup wizard, login, classes, cookies
+│   └── SMS.Api\             JSON host — JWT, same handlers, in-process
+├── tests\                   both still EMPTY — the largest gap
 ├── db\                      3 SQL scripts
-└── 4 markdown documents
+└── 6 markdown documents
 ```
 
-**Database, live and verified:** `master` holds 11 tables, `school_main` holds `class`. Both migrations applied.
+**Both hosts call `SMS.Application` directly. `SMS.Web` never calls `SMS.Api` over HTTP** —
+same process, so an HTTP hop would buy nothing. Architecture §11.
+
+**Database, live and verified:** `master` holds 13 tables, `school_main` holds `class`.
+Four migrations applied across the two contexts.
+
+**Ports:** Web `https://localhost:7106`, API `https://localhost:7286`. Both need
+`ASPNETCORE_ENVIRONMENT=Development` or user secrets do not load.
 
 **Verified against the running database, not assumed:**
 - `role_school_main` can `SELECT` from `master.school` but `CREATE TABLE` returns *permission denied*
@@ -245,15 +276,21 @@ The local PostgreSQL 18 is separate, accepts connections only from the machine i
 
 ---
 
-## 10. Gotchas that cost time — ten of them
+## 10. Gotchas that cost time — eighteen of them
 
-Recorded in full in `PROJECT_STATUS.md` §6. The five most likely to recur:
+Recorded in full in `PROJECT_STATUS.md` §6. The ones most likely to recur:
 
 1. **`UseXminAsConcurrencyToken()` no longer exists** in the EF Core 10 Npgsql provider, though tutorials still show it. Replaced by a local `UseXminConcurrencyToken()` extension.
-2. **A namespace called `School` shadows the `School` entity** and breaks the build. Namespaces are `SchoolData` and `SchoolSchema`.
+2. **A namespace that matches an entity name breaks the build.** It happened twice — first `School`, then `Installation`. `School`, `Installation`, `License` and `Branch` are all taken. Namespaces are `SchoolData`, `SchoolSchema` and `Setup`.
 3. **`CREATE DATABASE` cannot run inside a pgAdmin transaction.** Select that single line and press F5 — selecting text runs only the selection.
 4. **`LC_COLLATE 'en_US.UTF-8'` fails on Windows PostgreSQL.** Omit locale clauses entirely.
 5. **`dotnet ef migrations script --no-build` silently uses a stale assembly** and produces an empty script.
+
+### Three faults found in session 2, all of which had been failing silently
+
+6. **A password containing `;` broke the app connection string entirely.** `ConnectionStrings:App` held an unquoted 28-character password with a semicolon in it, so Npgsql split the tail into a bogus keyword and threw a *format* error before ever reaching the server. Nothing had connected as the application role until then, so it had never surfaced. Quote it — `Password=<"the value in double quotes">`. **Re-check after every rotation** — a generated password can contain one at any time.
+7. **The pre-commit password scan never ran.** `HOW_TO_VERIFY.md` §8 passed `-Include` and `-Recurse` to `Select-String`, which has neither. It threw, returned nothing, and the check reported "clean" without having looked. A safety check that fails open is worse than no check. Corrected.
+8. **Nothing updated `school.schema_version` after setup.** Only the setup wizard wrote it, so the second school-schema migration made the startup check refuse to serve — and on a customer's machine the *first* update shipped would have bricked the install until someone edited the row by hand, with no DBA on site. The migrations history is authoritative; a stale cache is now refreshed with a warning rather than refused.
 
 ---
 

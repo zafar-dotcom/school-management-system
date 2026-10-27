@@ -1,6 +1,6 @@
 # Project Status
 
-**Last updated:** 27 October 2026 — walking skeleton, then logic extracted to `SMS.Application` and `SMS.Api` added
+**Last updated:** 27 October 2026 — walking skeleton, `SMS.Application` extraction, `SMS.Api`, build configuration, and five decisions closed
 **Purpose:** Where the project actually stands — what is built, what is verified, what is not started, and what to do next.
 
 > Starting a new session? Read `SESSION_HANDOVER.md` first — it covers the whole picture including why decisions were made and what reversed.
@@ -13,6 +13,7 @@ This is the living progress document. The others change rarely:
 | `School_Management_System_Architecture_and_Decisions.md` | Decisions and why. Revision 9. |
 | `Master_Schema_Design.md` | The `master` schema design and its reasoning. |
 | `HOW_TO_VERIFY.md` | How to check anything is correct — connections, migrations, permissions, tables. |
+| `SETUP_NEW_MACHINE.md` | Bare laptop to running application. Needed once per machine. |
 | **`PROJECT_STATUS.md`** (this file) | Current state and next actions. |
 
 ---
@@ -21,7 +22,9 @@ This is the living progress document. The others change rarely:
 
 **The walking skeleton is complete, and it now runs behind two hosts.** The application starts, checks its schema, runs a first-time setup wizard, signs a user in, and serves a branch-filtered screen that proves the isolation mechanism end to end. The use cases live in `SMS.Application`; `SMS.Web` serves them as server-rendered MVC with cookies and `SMS.Api` serves them as JSON with JWT, both in-process. A .NET 10 solution with seven projects compiles clean with zero warnings. The `master` and `school_main` schemas exist in a local PostgreSQL 18 database, created by EF Core migrations, with a two-role permission model that has been tested and holds.
 
-Still missing above that line: any automated test, licence enforcement, the installer, and every feature module. The next step is the tests in section 7D, then the first feature module.
+Still missing: any automated test, licence enforcement, the installer, and every feature module. **Section 5 has the complete pending list, in order, with sizes.** The next step is the tests in §7D.
+
+**New machine?** `SETUP_NEW_MACHINE.md` takes you from a bare Windows laptop to a running application.
 
 **Scope reminder:** version 1 is **one school, one branch, one computer** (Model A). Multi-branch, LAN, multi-school and cloud are deferred — architecture document sections 1.1 to 1.3.
 
@@ -49,7 +52,7 @@ Still missing above that line: any automated test, licence enforcement, the inst
 | Schemas in each | `master`, `school_main` |
 | Owner / migration role | `sms_owner` — owns schemas, runs migrations |
 | Application role | `role_school_main` — read/write data only, cannot alter schema |
-| Credentials | .NET user secrets, id `4a4b251b-307d-4933-b84e-29e4e4f64e49`, shared by `SMS.Web` and `SMS.Infrastructure` |
+| Credentials | .NET user secrets, id `4a4b251b-307d-4933-b84e-29e4e4f64e49`, shared by `SMS.Web`, `SMS.Api` and `SMS.Infrastructure` |
 
 ### The three connection strings
 
@@ -86,8 +89,11 @@ That location is the point: a password outside the repository cannot be committe
 
 ### Solution structure
 
+The repository path does not matter — `D:\myprojectt` is simply where it was first built,
+and nothing depends on it.
+
 ```
-D:\myprojectt\
+<repo root>\
 ├── SchoolManagementSystem.slnx
 ├── src\
 │   ├── SMS.Domain\          entities, enums — no EF Core reference
@@ -105,11 +111,14 @@ D:\myprojectt\
 │   ├── 01_create_database_and_roles.sql   run manually, done (passwords scrubbed)
 │   ├── 02_master_schema.sql               generated — NOT the thing that ran
 │   └── 03_school_schema.sql               generated — NOT the thing that ran
+├── Directory.Packages.props   every NuGet version, declared once
+├── Directory.Build.props      net10.0, Nullable, warnings-as-errors
 ├── SESSION_HANDOVER.md
-├── HOW_TO_VERIFY.md
 ├── PROJECT_STATUS.md
 ├── School_Management_System_Architecture_and_Decisions.md
-└── Master_Schema_Design.md
+├── Master_Schema_Design.md
+├── HOW_TO_VERIFY.md
+└── SETUP_NEW_MACHINE.md
 ```
 
 Project references follow the Clean Architecture rule: `Application` → `Domain`;
@@ -268,32 +277,44 @@ Driven over HTTP against the live database, not reasoned about:
 
 ---
 
-## 5. What is NOT built
+## 5. What is NOT built — the complete pending list
 
-Nothing below has been started.
-
-### Foundation gaps — now closed
+### Already closed, so nobody re-opens them
 
 Dependency injection, `IClock`, `ITenantContext`, interceptor registration, the shared
 connection and transaction, the schema-version check, Serilog, Identity with cookies, the
-setup seed, the login screen and the class list are all built and exercised. See section 4.
+setup seed, the login screen, the class list, DPAPI key protection, the cross-schema
+foreign key on `class.branch_id`, the `SMS.Application` extraction, `SMS.Api`, and central
+package management. All built and exercised — see section 4.
 
-### Still not built
+### Pending, in the order it should be tackled
 
-| Item | Notes |
+| # | Item | Size | Notes |
+|---|---|---|---|
+| 1 | **Automated tests** | 2–3 days | **The largest gap by far.** Both test projects are empty. Everything in section 4 was verified by hand exactly once; nothing stops it regressing. The four that matter are listed in §7D |
+| 2 | `master.school_branding` migration | 2 hours | Designed in `Master_Schema_Design.md` §3.11 and decided. Cheapest to add now, while the table has one dev row and no production rows |
+| 3 | **Academic setup module** | 1–2 weeks | Academic year, class, section, subject. §7F has the `academic_year` table shape. Nothing blocks it |
+| 4 | UI design and theme set | 0.5–3 days | Alongside module 3. Eleven constraints in §7G; four or five themes with measured contrast ratios |
+| 5 | Audit log capture | 2–3 days | `AuditingInterceptor` stamps who and when on the row; it does not yet write field-level changes into `master.audit_log`. Due with the first feature module |
+| 6 | Licence enforcement | 1 week | Signature check at startup and daily, the four states, clock-tamper detection, offline renewal by importing a file. Blocked on the licence file format being decided |
+| 7 | `installation` row and clock high-water mark | 1 day | Table exists, nothing writes it. Needed before licensing can work |
+| 8 | Licence generator tool | 2–3 days | Internal console tool that signs a licence. **Not shipped with the product.** The private key never leaves our control |
+| 9 | Installer and packaging | 1–2 weeks | Bundle PostgreSQL, create the database, run migrations, Windows Service host, local backup with retention, diagnostics export, upgrade path |
+| 10 | Remaining feature modules | months | Teachers → students → attendance → fees → exams → reports. Order fixed in architecture §9.1 |
+
+### Known shortcuts, recorded so they are deliberate
+
+| Shortcut | Why it is acceptable for now |
 |---|---|
-| Any test, of any kind | Both test projects are still empty. This is now the largest single gap — everything in section 4 was verified by hand once, and nothing stops it regressing |
-| Licence enforcement | No `license` row is written at setup and nothing validates one. The file format and the signing tool are both still open, so there is nothing to validate against |
-| Licence generator tool | Internal console tool, for signing licence files |
-| Installer and packaging | Including the Windows Service host and local backup |
-| Audit log capture | `AuditingInterceptor` stamps who and when on the row itself; it does not yet write field-level changes into `master.audit_log`. Planned alongside the first feature module |
-| `installation` row | The table exists; no row is written and the clock high-water mark is not maintained. Needed with licensing |
-| Cross-schema FK from `class.branch_id` to `master.branch` | Architecture §4.3 and §4.7 call for a real foreign key. There is none, which is how the filter test in section 4 was able to insert a non-existent branch |
-| All feature modules | Academic setup, teachers, students, attendance, fees, exams, reports |
+| No `license` row written at setup | The file format and signing tool do not exist, so nothing could validate it. A row nothing verifies is worse than no row |
+| `Jwt:SigningKey` unset | Development generates an ephemeral key and warns. The API refuses to start without one outside Development, so this cannot reach a customer |
+| The class screen prints a raw branch GUID | It exists to prove the branch filter. Remove it when the screen becomes real — §7G |
+| Dev data in the local database | One school "Greenfield Public School", admin `admin@greenfield.test`, four classes. Dev only |
 
 ### Housekeeping
 
-Version control is in place — see section 7B. No gap outstanding here.
+Version control is in place — see §7B. Machine setup is documented in
+`SETUP_NEW_MACHINE.md`. No gap outstanding here.
 
 ---
 
