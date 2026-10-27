@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SMS.Domain.Master;
@@ -13,7 +14,7 @@ namespace SMS.Infrastructure.Persistence;
 /// that a structural fact rather than a rule someone has to remember.
 /// </para>
 /// </summary>
-public class MasterDbContext : IdentityUserContext<AppUser, Guid>
+public class MasterDbContext : IdentityUserContext<AppUser, Guid>, IDataProtectionKeyContext
 {
     public const string Schema = "master";
 
@@ -26,6 +27,13 @@ public class MasterDbContext : IdentityUserContext<AppUser, Guid>
     public DbSet<Installation> Installations => Set<Installation>();
     public DbSet<License> Licenses => Set<License>();
     public DbSet<AuditLogEntry> AuditLog => Set<AuditLogEntry>();
+
+    /// <summary>
+    /// The ASP.NET Core data-protection key ring. Held in the database rather than on the
+    /// filesystem so authentication cookies survive a reinstall and a second instance is
+    /// already catered for — architecture section 8. Shape is fixed by the framework.
+    /// </summary>
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

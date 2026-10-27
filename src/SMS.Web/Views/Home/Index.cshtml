@@ -1,8 +1,37 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@using System.Security.Claims
+@using SMS.Web.Tenancy
+@{
+    ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <h1 class="h3">Signed in</h1>
+    <p>
+        The walking skeleton is complete: the schema check passed, you authenticated against
+        <code>master.app_user</code>, and your school and branch were resolved from your
+        membership and re-validated against the database on this request.
+    </p>
+
+    <dl class="row" style="max-width: 40rem;">
+        <dt class="col-sm-4">Account</dt>
+        <dd class="col-sm-8">@User.Identity!.Name</dd>
+
+        <dt class="col-sm-4">Role</dt>
+        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaims.SchoolRole)</dd>
+
+        <dt class="col-sm-4">Branch scope</dt>
+        <dd class="col-sm-8">@User.FindFirstValue(SchoolClaims.BranchScope)</dd>
+
+        <dt class="col-sm-4">Active branch</dt>
+        <dd class="col-sm-8"><code>@User.FindFirstValue(SchoolClaims.ActiveBranchId)</code></dd>
+    </dl>
+
+    <a class="btn btn-primary" asp-controller="Classes" asp-action="Index">Open classes</a>
+}
+else
+{
+    <h1 class="h3">School Management System</h1>
+    <p>Please sign in to continue.</p>
+    <a class="btn btn-primary" asp-controller="Account" asp-action="Login">Sign in</a>
+}

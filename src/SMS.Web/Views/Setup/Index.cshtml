@@ -1,0 +1,80 @@
+@model SMS.Web.Models.SetupViewModel
+@{
+    ViewData["Title"] = "Set up this school";
+    Layout = "_Layout";
+}
+
+<h1 class="h3 mb-3">Set up this school</h1>
+<p class="text-muted">
+    This runs once. It registers the school, creates its Main branch, and creates the first
+    administrator account.
+</p>
+
+<form method="post" class="row g-3" style="max-width: 36rem;">
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger d-none-if-empty"></div>
+
+    <div class="col-12">
+        <label asp-for="SchoolName" class="form-label"></label>
+        <input asp-for="SchoolName" class="form-control" autocomplete="off" />
+        <span asp-validation-for="SchoolName" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="BranchName" class="form-label"></label>
+        <input asp-for="BranchName" class="form-control" autocomplete="off" />
+        <div class="form-text">Version 1 runs a single branch, coded MAIN.</div>
+        <span asp-validation-for="BranchName" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="TimeZone" class="form-label"></label>
+        <input asp-for="TimeZone" class="form-control" list="zones" autocomplete="off" />
+        <datalist id="zones">
+            <option value="Asia/Karachi"></option>
+            <option value="Asia/Dubai"></option>
+            <option value="Asia/Kolkata"></option>
+            <option value="Europe/London"></option>
+            <option value="UTC"></option>
+        </datalist>
+        <div class="form-text">
+            IANA name. Times are stored in UTC and shown in the branch's zone.
+        </div>
+        <span asp-validation-for="TimeZone" class="text-danger"></span>
+    </div>
+
+    <hr class="mt-4" />
+    <h2 class="h5">First administrator</h2>
+
+    <div class="col-12">
+        <label asp-for="AdminDisplayName" class="form-label"></label>
+        <input asp-for="AdminDisplayName" class="form-control" autocomplete="off" />
+        <span asp-validation-for="AdminDisplayName" class="text-danger"></span>
+    </div>
+
+    <div class="col-12">
+        <label asp-for="AdminEmail" class="form-label"></label>
+        <input asp-for="AdminEmail" class="form-control" autocomplete="off" />
+        <span asp-validation-for="AdminEmail" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="Password" class="form-label"></label>
+        <input asp-for="Password" class="form-control" autocomplete="new-password" />
+        <div class="form-text">At least 12 characters, with upper, lower, a digit and a symbol.</div>
+        <span asp-validation-for="Password" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-6">
+        <label asp-for="ConfirmPassword" class="form-label"></label>
+        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+    </div>
+
+    <div class="col-12 mt-4">
+        <button type="submit" class="btn btn-primary">Complete setup</button>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -192,10 +192,25 @@ dotnet ef migrations script --project src/SMS.Infrastructure --context SchoolDbC
 Run before every commit:
 
 ```powershell
-Select-String -Path . -Pattern "Password=(?!REPLACE|NEW|\.\.\.)" -Include *.cs,*.json,*.sql,*.md -Recurse | Where-Object { $_.Path -notmatch "\\(bin|obj)\\" }
+Get-ChildItem -Recurse -Include *.cs,*.json,*.sql,*.md -File |
+  Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } |
+  Select-String -Pattern "Password=(?!REPLACE|NEW|\.\.\.|not-configured|<)" |
+  Where-Object { $_.Line -notmatch 'Select-String' }
 ```
 
 **Expect no results.** Anything found must be replaced with a placeholder before committing.
+
+> An earlier version of this command passed `-Include` and `-Recurse` to `Select-String`,
+> which has neither parameter. It threw, the result was empty, and the check therefore
+> reported "clean" without ever having looked — the worst way for a safety check to fail.
+> Filtering with `Get-ChildItem` first is what makes it actually run.
+>
+> `not-configured` is excluded because `DesignTimeFactories.cs` carries it as a deliberate
+> placeholder, so that `dotnet ef` gives a clear error on a machine with no secrets set
+> instead of a confusing one. The last two filters drop this command's own line and any
+> documentation that writes the keyword followed by `<`, so a genuine hit is the only thing
+> this ever prints. **Keep it that way** — a check that always prints something is a check
+> nobody reads.
 
 Real credentials belong only here, outside the repository:
 

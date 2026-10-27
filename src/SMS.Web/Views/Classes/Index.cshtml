@@ -1,0 +1,89 @@
+@model SMS.Web.Models.ClassListViewModel
+@{
+    ViewData["Title"] = "Classes";
+    Layout = "_Layout";
+}
+
+<h1 class="h3">Classes</h1>
+<p class="text-muted">
+    @Model.SchoolName — @Model.BranchName branch
+    <br />
+    <small>
+        Every row below was filtered to branch <code>@Model.ActiveBranchId</code> by the
+        global query filter, not by anything this page wrote.
+    </small>
+</p>
+
+<div class="row">
+    <div class="col-lg-7">
+        @if (Model.Classes.Count == 0)
+        {
+            <div class="alert alert-light border">No classes yet. Add the first one.</div>
+        }
+        else
+        {
+            <table class="table table-sm align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">Code</th>
+                        <th scope="col">Name</th>
+                        <th scope="col" class="text-end">Order</th>
+                        <th scope="col">Branch</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model.Classes)
+                {
+                    <tr>
+                        <td><code>@item.Code</code></td>
+                        <td>@item.Name</td>
+                        <td class="text-end">@item.SortOrder</td>
+                        <td><small class="text-muted">@item.BranchId</small></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h6 card-title">Add a class</h2>
+
+                <form method="post" asp-action="Create">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger d-none-if-empty"></div>
+
+                    <div class="mb-2">
+                        <label asp-for="NewClass.Code" class="form-label"></label>
+                        <input asp-for="NewClass.Code" class="form-control" autocomplete="off" placeholder="G1" />
+                        <span asp-validation-for="NewClass.Code" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-2">
+                        <label asp-for="NewClass.Name" class="form-label"></label>
+                        <input asp-for="NewClass.Name" class="form-control" autocomplete="off" placeholder="Grade 1" />
+                        <span asp-validation-for="NewClass.Name" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="NewClass.SortOrder" class="form-label"></label>
+                        <input asp-for="NewClass.SortOrder" class="form-control" style="max-width: 8rem;" />
+                        <span asp-validation-for="NewClass.SortOrder" class="text-danger"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm">Add class</button>
+                </form>
+
+                <p class="form-text mt-3 mb-0">
+                    There is no branch field on this form. <code>BranchId</code> is set
+                    server-side from the resolved context — architecture section 4.6.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

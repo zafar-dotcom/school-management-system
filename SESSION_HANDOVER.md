@@ -149,7 +149,9 @@ Total overhead: two to three days. It is the difference between *adding a featur
 
 **Expect pressure to drop `BranchId`** around month two — "we only have one branch, why write this everywhere?" The answer is the table above.
 
-**Known consequence of the single-branch test seed:** the branch filter is never exercised in version 1. Testing it with two branches is recorded as the first task of phase D2, before any branch UI is built.
+**Known consequence of the single-branch test seed:** the branch filter is never exercised by the *seed* in version 1. Testing it with two branches is recorded as the first task of phase D2, before any branch UI is built.
+
+The filter predicate itself is no longer unproven, though: inserting a row with a foreign `branch_id` directly in SQL and confirming the application does not show it exercises the filter without a second branch. That was done on 27 October 2026 — `PROJECT_STATUS.md` §4. It does not replace the D2 test, which also covers switching, scope and the widened-scope service.
 
 ---
 
@@ -274,18 +276,26 @@ Verified before pushing: 131 files committed, `bin/` and `obj/` excluded, no rea
 
 **Before every future commit**, run section 8 of `HOW_TO_VERIFY.md` — the scan for passwords in the project folder. Removing a secret after it has been pushed is painful.
 
-### Then: make the application start
+**C. ~~Make the application start~~ — done, 27 October 2026.** All six steps are built and
+were verified by running the application against the live database: the startup schema gate,
+the setup wizard, login, the branch-filtered class list, server-set `BranchId`, and
+membership revocation. `PROJECT_STATUS.md` §4 records exactly what was proved and how.
 
-The database works but the application does nothing. Six steps:
+Run it with:
 
-1. Implement `IClock` and `ITenantContext` in `SMS.Infrastructure`
-2. Wire DI in `SMS.Web/Program.cs` — both DbContexts **sharing one connection and transaction**, the audit interceptor, Serilog
-3. Add the startup schema-version check that refuses a mismatched schema
-4. Configure Identity with cookie authentication and persisted data-protection keys
-5. Build the setup seed — one school, one `Main` branch, the first School Admin account
-6. A login page and a bare `class` list, proving the branch filter end to end
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+dotnet run --project src/SMS.Web
+```
 
-At the end of that, the walking skeleton is complete and you can log in.
+User secrets load only in Development — without that variable you get
+"ConnectionStrings:App is not configured".
+
+### Then: the tests that do not exist yet
+
+This now comes before feature work. Everything above was verified once, by hand, and nothing
+stops it regressing — and these are the behaviours architecture §10 requires tests for.
+`PROJECT_STATUS.md` §7D lists the four.
 
 ### Then: the first feature module
 
