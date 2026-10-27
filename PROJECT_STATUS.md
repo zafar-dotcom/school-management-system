@@ -36,6 +36,7 @@ The foundation is built and running. A .NET 10 solution with six projects compil
 | PostgreSQL | 18.1, local service `postgresql-x64-18`, port 5432 |
 | psql | `C:\Program Files\PostgreSQL\18\bin\psql.exe` (not on PATH) |
 | Solution file | `SchoolManagementSystem.slnx` (new .slnx format) |
+| Git remote | `https://github.com/zafar-dotcom/school-management-system` (private), branch `main` |
 
 ### Database
 
@@ -230,17 +231,21 @@ dotnet user-secrets set "ConnectionStrings:TestOwner" "Host=localhost;Port=5432;
 
 Verify with `dotnet ef migrations list --project src/SMS.Infrastructure --context MasterDbContext`. If the owner password is right it connects and shows `InitialMaster` as applied; if wrong, you get an authentication error.
 
-### B. Put the project under version control
+### B. ✅ Put the project under version control — DONE
+
+Repository: `https://github.com/zafar-dotcom/school-management-system` — **private**, branch `main`, first commit `e0d4ef0` pushed.
+
+Checked before pushing: 131 files committed, `bin/` and `obj/` excluded by `.gitignore`, no real password in any committed file, and only `secrets.example.json` (the placeholder template) included. Real credentials stay in user secrets outside the project folder.
+
+**Routine from here:**
 
 ```powershell
-cd D:\myprojectt
-dotnet new gitignore
-git init
 git add .
-git commit -m "Foundation: solution, master and school schemas, first migrations"
+git commit -m "what changed"
+git push
 ```
 
-The `.gitignore` from `dotnet new gitignore` excludes `bin/`, `obj/` and the rest. User secrets already live outside the project folder, so no password can be committed.
+**Run section 8 of `HOW_TO_VERIFY.md` before every commit** — the scan for passwords in the project folder. Removing a secret after it has been pushed is painful.
 
 ### C. Make the application start
 

@@ -20,8 +20,7 @@ Read these five files before doing anything, in this order:
 
 Then confirm back to me, briefly:
   - what is already built
-  - the outstanding task before new work
-  - what the next six steps are
+  - that nothing is outstanding, and what the next six steps are
 
 Do not re-open decisions already recorded as closed.
 Two standing rules: this project only ever touches the LOCAL PostgreSQL
@@ -265,21 +264,15 @@ Observed through the session; worth honouring.
 
 ## 12. Exactly where to resume
 
-### One thing outstanding before new work
+### Nothing is outstanding — start straight on the work below
 
-**A. ~~Rotate the database passwords~~ — done.** Both roles were rotated and the originals scrubbed from the setup script. `PROJECT_STATUS.md` §7A has the commands for any future rotation.
+**A. ~~Rotate the database passwords~~ — done.** Both roles were rotated, the secrets re-set under their new names, and the originals scrubbed from `db/01_create_database_and_roles.sql`. `PROJECT_STATUS.md` §7A has the commands for any future rotation.
 
-**B. Put the project under version control.** It is not a git repository and has no `.gitignore`. There is real code now with no history and no backup.
+**B. ~~Put the project under version control~~ — done.** The repository is live at `https://github.com/zafar-dotcom/school-management-system` (private), branch `main`, first commit pushed.
 
-```powershell
-cd D:\myprojectt
-dotnet new gitignore
-git init
-git add .
-git commit -m "Foundation: solution, master and school schemas, first migrations"
-```
+Verified before pushing: 131 files committed, `bin/` and `obj/` excluded, no real password anywhere, and only `secrets.example.json` — the placeholder template — included. Real credentials live in user secrets outside the project folder.
 
-User secrets live outside the project folder, so no password can be committed.
+**Before every future commit**, run section 8 of `HOW_TO_VERIFY.md` — the scan for passwords in the project folder. Removing a secret after it has been pushed is painful.
 
 ### Then: make the application start
 
