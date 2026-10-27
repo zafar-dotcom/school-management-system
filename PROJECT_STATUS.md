@@ -490,6 +490,67 @@ WPF      ──>  SMS.Api (JSON, JWT)    ──┘
 
 When adding each branch-scoped table, remember the cross-schema foreign key from section C2.
 
+#### Academic year — decided 27 October 2026
+
+**The School Admin creates academic years from a screen. The product does not assume a
+calendar.**
+
+This is the right answer rather than a deferral. Pakistani schools run different sessions
+depending on the board, and a hardcoded start month would have been wrong for a large share
+of customers and impossible to correct without a migration. Dates are data.
+
+**Common Pakistani patterns, offered as presets that prefill the date fields — not stored,
+not enforced:**
+
+| Preset | Typical of |
+|---|---|
+| April – March | Government schools following the Punjab and Sindh boards |
+| August – May | Many private schools |
+| September – June | Cambridge and other international curricula |
+| January – December | Used by some institutions |
+
+The admin can override any of them. Treat these as a convenience only; confirm the exact
+dates with the first customer rather than trusting this table.
+
+**Table shape** — school-wide, no `BranchId` (architecture §4.4, Revision 7), living in the
+school schema:
+
+```sql
+CREATE TABLE school_main.academic_year (
+    id          uuid        NOT NULL,
+    name        varchar(50) NOT NULL,   -- "2026-2027", chosen by the admin
+    starts_on   date        NOT NULL,
+    ends_on     date        NOT NULL,
+    status      varchar(20) NOT NULL,   -- planning | active | closed
+    ...audit columns...
+    CONSTRAINT ck_academic_year_dates  CHECK (ends_on > starts_on),
+    CONSTRAINT ck_academic_year_status CHECK (status IN ('planning','active','closed')),
+    CONSTRAINT uq_academic_year_name   UNIQUE (name)
+);
+
+-- At most one active year, the same trick as uq_branch_one_default_per_school.
+CREATE UNIQUE INDEX uq_academic_year_one_active
+    ON school_main.academic_year ((true)) WHERE status = 'active';
+
+-- Let the database refuse overlapping sessions rather than trusting a form check.
+-- Range exclusion constraints need no extension; gist handles daterange natively.
+ALTER TABLE school_main.academic_year
+    ADD CONSTRAINT ex_academic_year_no_overlap
+    EXCLUDE USING gist (daterange(starts_on, ends_on, '[]') WITH &&);
+```
+
+**`date`, not `timestamptz` — and this is a deliberate exception to architecture §8.**
+That section mandates `timestamptz` in UTC, and it is right about *points in time*. An
+academic year's start is not a point in time; it is a calendar date. Stored as
+`timestamptz`, 1 April in `Asia/Karachi` becomes `2026-03-31T19:00Z`, and anything that
+renders it in UTC shows **31 March**. Attendance timestamps stay `timestamptz`; session
+boundaries, term dates and date of birth are `date`. Getting this wrong is an off-by-one-day
+bug that appears only for some users, which is the worst kind.
+
+**Authorization:** creating and closing an academic year is School Admin only. Branch Admin
+and below must not reach it — it is school-wide configuration, and closing the wrong year
+would affect every branch.
+
 ### G. The user interface — deliberately deferred to the academic-setup module
 
 **Decided 27 October 2026.** The screens built so far are stock Bootstrap 5 with no design
@@ -520,15 +581,45 @@ changes what gets stored:
 2. **Store one brand colour, compute the rest.** Derive foreground and shades from it, enforcing 4.5:1. More flexible, more code.
 3. **Store free hex but validate the ratio on save** and refuse a failing pair. Most flexible, and the one most likely to produce an argument with a customer who wants their exact brand colour.
 
-**Recommendation: option 1 for version 1**, with the school's logo free-form. Experience of
-school branding is that the logo carries almost all of the recognition — it is what appears
-on a report card — and the colour matters much less than customers say it does.
+**Decided 27 October 2026: option 1** — a fixed set of pre-validated themes, with a
+free-form logo. Every theme's contrast is checked once, by us, so AA cannot be broken by a
+customer's colour choice. The logo carries almost all of the recognition anyway — it is what
+appears on a report card.
 
-#### Still needed, and now the only thing blocking academic setup
+#### Branding — the shape to build
 
-**When does the academic year start?** April–March, August–May, or September–June all exist
-in Pakistani schools depending on the board. This shapes the `academic_year` table and the
-term structure, and academic setup builds it first.
+```sql
+CREATE TABLE master.school_branding (
+    school_id          uuid         NOT NULL,
+    theme              varchar(30)  NOT NULL DEFAULT 'default',
+    logo_content       bytea        NULL,
+    logo_content_type  varchar(100) NULL,
+    logo_updated_at    timestamptz  NULL,
+    ...audit columns...
+    CONSTRAINT pk_school_branding    PRIMARY KEY (school_id),
+    CONSTRAINT fk_school_branding    FOREIGN KEY (school_id)
+                                     REFERENCES master.school (id) ON DELETE CASCADE,
+    CONSTRAINT ck_school_branding_theme CHECK (theme IN (...the published theme names...)),
+    -- Both logo columns are set, or neither is.
+    CONSTRAINT ck_school_branding_logo  CHECK ((logo_content IS NULL) = (logo_content_type IS NULL))
+);
+```
+
+Four decisions inside that, each with a reason:
+
+- **A separate table, not columns on `school`.** `master.school` is read during tenant resolution on **every request**. A `bytea` logo hanging off that entity is a blob one careless `Include` away from riding along on every page load. Branding is loaded deliberately, and can be cached.
+- **The logo lives in the database, not on disk.** It is a few kilobytes. Backup and restore stay a single operation on one database — which matters when the customer owns the machine and will not run two backup jobs. It also sidesteps the predictable-file-path tenancy surface architecture §8 warns about.
+- **PNG and JPEG only. Reject SVG.** An SVG is a document that can carry script. It is inert inside an `<img>` tag today, but the first time someone inlines it to recolour it, it stops being inert. Refusing the format is cheaper than remembering the rule forever. Cap the upload at a few hundred KB.
+- **`theme` is `varchar` + `CHECK`, matching every other enum in `master`** (`Master_Schema_Design` §1). Adding a theme later is a one-line migration.
+
+**Themes still to define:** four or five named palettes, each with its contrast ratios
+measured and recorded, exposed as CSS custom properties. Do this with the layout work, not
+before — the palette is only meaningful against real screens.
+
+#### Nothing now blocks academic setup
+
+The academic-year question is answered: the School Admin creates them from a screen, so the
+product assumes no calendar. See §7F.
 
 #### Branding columns — add them before academic setup, not after
 
@@ -610,8 +701,8 @@ Full list in architecture document section 12.
 
 | Decision | Needed before |
 |---|---|
-| **Academic year start month** — April–March, August–May or September–June | **Academic setup. The only open item that blocks it** |
-| How per-school colour is reconciled with WCAG 2.1 AA — see §7G | The branding columns, which should land before academic setup |
+| ~~Academic year start month~~ | **Closed.** The School Admin creates academic years from a screen; the product assumes no calendar — §7F |
+| ~~How per-school colour is reconciled with WCAG 2.1 AA~~ | **Closed.** Fixed set of pre-validated themes, free-form logo — §7G |
 | Windows / domain login in scope? | Identity configuration (already built with password login; this would add a second scheme) |
 | Licence file format and contents | The installer |
 | Which modules ship in the first release | Starting feature modules |

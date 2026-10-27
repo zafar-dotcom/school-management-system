@@ -96,6 +96,10 @@ A new session must know what changed, or it will act on a superseded decision fo
 | 13 | Test seed | **Changed:** two branches in dev → **one branch, matching production**, at the user's direction |
 | 14 | `SMS.Api` timing | **Changed:** deferred to phase D5 → **built now, alongside `SMS.Web`** (Revision 8). A mobile client is planned as well as WPF. The web UI stays server-rendered MVC. |
 | 15 | Per-module class libraries | **Confirmed not happening.** Modules are folders inside the layers, as §3.3 always said (Revision 8) |
+| 16 | Target market | **Pakistan.** `Asia/Karachi`, PKR, `dd/MM/yyyy` are real defaults now, not placeholders |
+| 17 | Interface language | **English only**, expected permanently. Strings hardcoded, no resource files |
+| 18 | Academic year | **Admin-created from a screen.** The product assumes no calendar — presets only prefill the form |
+| 19 | Branding and accessibility | **WCAG 2.1 AA**, with a fixed set of pre-validated themes plus a free-form per-school logo. Free colour choice and an AA commitment cannot coexist |
 
 ### The two reversals worth understanding properly
 
@@ -339,8 +343,8 @@ None of these block the next work.
 | Licence file format and contents | The installer |
 | Which modules ship in the first release | Starting feature modules |
 | Attendance: daily or period-wise? | The attendance module |
-| **Academic year start month** — April–March, August–May or September–June | **Academic setup. This is the only thing now blocking it** |
-| How per-school colour is reconciled with WCAG 2.1 AA | The branding columns — `PROJECT_STATUS.md` §7G |
+| ~~Academic year start month~~ | **Closed.** Admin-created from a screen; no calendar assumed — `PROJECT_STATUS.md` §7F |
+| ~~Per-school colour versus WCAG 2.1 AA~~ | **Closed.** Fixed pre-validated themes, free-form logo — `PROJECT_STATUS.md` §7G |
 | Invoice cycle, late fees, tax fields, payment gateway | The fees module |
 | Grading scheme, report-card layout | The exams module |
 | Branch address detail, multi-school membership, `display_name` semantics | Cosmetic; decide any time |
