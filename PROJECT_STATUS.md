@@ -498,10 +498,50 @@ applied. That is a scaffold, not an oversight, and it stays that way until acade
 **Why wait:** the class list exists to prove the branch filter, not to be a product screen —
 it prints a raw branch GUID in a column for exactly that reason. Designing against one
 proof-of-concept screen means redoing it. Academic setup produces four or five screens that
-resemble the real product, and both open decisions that bear on this — **target market and
-country**, and **visual design and accessibility requirements** (architecture §12) — are
-still unresolved. Choosing a palette and typography before knowing who buys this is
-throwaway work.
+resemble the real product.
+
+#### Decided 27 October 2026 — these were the blocking answers
+
+| Decision | Answer | What it changes |
+|---|---|---|
+| Target market | **Pakistan** | `Asia/Karachi` is the real default, not a placeholder. PKR, 2 decimals, `dd/MM/yyyy` |
+| Interface language | **English only**, likely permanently | Hardcoded strings, no resource files. Reversing this is a seven-module retrofit — recorded, not assumed away |
+| Branding | **Each school sets logo and colours** | A schema change to `master.school`, plus a logo storage decision. Not a stylesheet setting |
+| Accessibility | **WCAG 2.1 AA** | Contrast, keyboard navigation, visible focus, labelled controls, semantic headings, alt text — designed in, not audited in later |
+
+#### The branding and accessibility answers conflict — resolve before building either
+
+A school that picks a pale yellow primary produces text that fails AA contrast. "Store the
+hex the customer typed" and "commit to WCAG 2.1 AA" cannot both be true. Three workable
+answers, to pick between before the branding columns are designed, because the choice
+changes what gets stored:
+
+1. **A fixed set of pre-validated themes.** The school chooses one; every combination is checked once, by us. Simplest, and the easiest to support.
+2. **Store one brand colour, compute the rest.** Derive foreground and shades from it, enforcing 4.5:1. More flexible, more code.
+3. **Store free hex but validate the ratio on save** and refuse a failing pair. Most flexible, and the one most likely to produce an argument with a customer who wants their exact brand colour.
+
+**Recommendation: option 1 for version 1**, with the school's logo free-form. Experience of
+school branding is that the logo carries almost all of the recognition — it is what appears
+on a report card — and the colour matters much less than customers say it does.
+
+#### Still needed, and now the only thing blocking academic setup
+
+**When does the academic year start?** April–March, August–May, or September–June all exist
+in Pakistani schools depending on the board. This shapes the `academic_year` table and the
+term structure, and academic setup builds it first.
+
+#### Branding columns — add them before academic setup, not after
+
+`master.school` currently has no branding columns. The project's own principle (§9 of
+`Master_Schema_Design`, the reasoning behind carrying `is_platform_admin` and
+`country_code`) says adding columns to a populated table later is the expensive version.
+There is one school row in dev and none in production, so now is the cheapest this will
+ever be.
+
+Two things to settle at the same time:
+
+- **Where the logo lives.** Recommendation for Model A: **store it in the database**, not on disk. It is a few kilobytes, backup and restore stay a single operation on one file, and it avoids the predictable-file-path tenancy surface that architecture §8 warns about entirely. Revisit only if schools start uploading large assets.
+- **What colour data is stored**, which falls out of the conflict resolution above.
 
 **Remove when the class screen becomes real:** the `Branch` column showing a GUID, and the
 explanatory note under the form. Both are scaffolding that proved a point and should not
@@ -522,8 +562,10 @@ These follow from Model A and are not negotiable later without rework.
 | 7 | **The maintenance page must stay dependency-free** | `InstallationGateMiddleware` returns plain text today. It renders precisely when the schema is wrong or the database is unreachable, so it must not depend on a layout, a view engine, or anything read from the database. Style it with inline CSS only, or leave it as text |
 | 8 | **Keep `asp-append-version`** | The installer replaces files in place during an upgrade. Without a content hash in the URL, a school's browser serves last version's cached CSS against this version's markup |
 | 9 | **Decide the minimum browser** | Architecture §12 lists supported Windows versions as open; the browser question rides along with it. An old Edge on a school PC is a real possibility |
-| 10 | **Accessibility level is still unresolved** | Architecture §12. Decide before the design is built, not after — retrofitting contrast ratios and keyboard navigation is far more expensive than designing with them |
+| 10 | **WCAG 2.1 AA, designed in** | Decided. Bootstrap's defaults do not get there on their own — `.text-muted` on white fails AA, and the default `btn-primary` blue is borderline. Both are already used in the current scaffold and need replacing |
 | 11 | **Never put student data in a URL** | Already a rule (architecture §8, opaque identifiers), but it constrains how screens are routed and linked |
+| 12 | **English only, hardcoded** | Decided. No resource files. If it ever reverses, every view, validation message and email template is in scope |
+| 13 | **The school's logo needs alt text, and it comes from the school** | A per-school logo under a WCAG commitment means the alt text cannot be hardcoded. Use the school name |
 
 **Effort when it happens:** roughly half a day for a working layout — brand bar, navigation,
 consistent page headers, a reusable table and form style, validation presentation, empty
@@ -564,14 +606,19 @@ dotnet ef migrations script --project src/SMS.Infrastructure --context SchoolDbC
 
 ## 9. Decisions still open
 
-These do not block the next work. Full list in architecture document section 12.
+Full list in architecture document section 12.
 
 | Decision | Needed before |
 |---|---|
-| Windows / domain login in scope? | Identity configuration (step C4) |
+| **Academic year start month** — April–March, August–May or September–June | **Academic setup. The only open item that blocks it** |
+| How per-school colour is reconciled with WCAG 2.1 AA — see §7G | The branding columns, which should land before academic setup |
+| Windows / domain login in scope? | Identity configuration (already built with password login; this would add a second scheme) |
 | Licence file format and contents | The installer |
 | Which modules ship in the first release | Starting feature modules |
 | Attendance: daily or period-wise? | The attendance module |
-| Currency, decimal precision, invoice cycle, late fees, payment gateway | The fees module |
+| Invoice cycle, late fees, tax fields, payment gateway | The fees module |
 | Grading scheme and report-card layout | The exams module |
-| Target market and country | Nothing yet — affects data retention and consent rules later |
+| Pakistan's data-protection position for records about minors | Writing any retention or consent rule. **Verify it; do not assume it mirrors GDPR** |
+
+**Closed 27 October 2026:** target market **Pakistan** (PKR, 2 decimals, `Asia/Karachi`,
+`dd/MM/yyyy`); **English only**; **per-school logo and colours**; **WCAG 2.1 AA**.

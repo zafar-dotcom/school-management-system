@@ -1069,7 +1069,7 @@ The architecture direction is agreed, but these details are **not yet finalized*
 
 **Requires input before design can continue**
 
-- **Target market and country.** Not yet stated anywhere, and it determines data residency, retention periods, parental consent, and data-subject-request obligations for a system holding records about minors. This also constrains the hosting choice.
+- ~~**Target market and country.**~~ **Decided: Pakistan.** `Asia/Karachi` in the setup wizard is therefore the real default, not a placeholder. Consequences: currency is PKR with 2 decimal places; dates display `dd/MM/yyyy`. **Still to confirm before the fees module:** whether invoices need tax fields. **Still to verify before any retention or consent policy is written:** Pakistan's data-protection position for records about minors — do not assume it mirrors GDPR, and do not write a retention rule from assumption. Data residency stops mattering only while the product is on-premise; it returns at Model C.
 - **Target scale.** Expected number of schools, branches per school, and students per branch, for year one and year three. Under schema-per-school this drives the **total table count in one database**, which is the metric that decides when the model must change (Section 4.9). It matters more under this design than it did under database-per-school.
 - **Which modules ship in the first release.** The build *order* is now fixed (Section 9.1, steps 6 to 12). What is still open is where the first release stops — a sellable v1 may be steps 6 to 9 only, with fees and exams following. Decide this with the first customer, not in advance.
 
@@ -1098,7 +1098,11 @@ The architecture direction is agreed, but these details are **not yet finalized*
 - File storage provider and layout.
 - Email/SMS provider and other external services.
 - Tenant offboarding: what happens when a school leaves or a subscription lapses — read-only period, data export, retention window, and eventual deletion.
-- Frontend visual design and accessibility requirements.
+- ~~Frontend visual design and accessibility requirements.~~ **Decided**, 27 October 2026:
+  - **Interface language: English only**, and expected to stay that way. Strings are hardcoded; no resource files. *Consequence if this ever reverses:* every view, validation message and email template has to be revisited. That is a genuine retrofit, in the same category as the `BranchId` warning in §1.3 — so it is recorded here rather than assumed away.
+  - **Each school sets its own logo and colours.** This is a schema change, not a stylesheet setting — `master.school` needs branding columns, and the logo needs a storage decision. See `PROJECT_STATUS.md` §7G.
+  - **Accessibility target: WCAG 2.1 AA.** Designed in from the first screen. Contrast ratios, keyboard navigation, visible focus, labelled form controls, semantic headings, alt text.
+  - **These last two conflict, and the conflict must be resolved in the design.** A school that picks a pale yellow as its primary colour produces text that fails AA contrast. Per-school colour and a formal contrast commitment cannot both be honoured by simply storing whatever hex value was typed. Resolve it one of three ways: offer a fixed set of pre-validated themes; compute the foreground colour from the chosen background and enforce a 4.5:1 ratio; or validate the ratio on save and refuse a failing combination. Decide before the branding columns are designed, because the answer changes what is stored.
 
 Do not treat these open questions as already implemented decisions. Resolve them when the corresponding design work begins.
 

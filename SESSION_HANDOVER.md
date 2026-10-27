@@ -339,9 +339,12 @@ None of these block the next work.
 | Licence file format and contents | The installer |
 | Which modules ship in the first release | Starting feature modules |
 | Attendance: daily or period-wise? | The attendance module |
-| Currency, decimal precision, invoice cycle, late fees, payment gateway | The fees module |
+| **Academic year start month** — April–March, August–May or September–June | **Academic setup. This is the only thing now blocking it** |
+| How per-school colour is reconciled with WCAG 2.1 AA | The branding columns — `PROJECT_STATUS.md` §7G |
+| Invoice cycle, late fees, tax fields, payment gateway | The fees module |
 | Grading scheme, report-card layout | The exams module |
-| Target market and country | Later — affects retention and consent rules |
 | Branch address detail, multi-school membership, `display_name` semantics | Cosmetic; decide any time |
+
+**Closed 27 October 2026:** target market is **Pakistan** (so PKR, `Asia/Karachi`, `dd/MM/yyyy`); interface is **English only**; **each school sets its own logo and colours**; accessibility target is **WCAG 2.1 AA**. Architecture §12 carries the consequences, including the branding-versus-contrast conflict that has to be resolved before the branding columns are designed.
 
 One gap recorded for the future, **not a problem with one school**: every tenant role can read all of `master`, including `app_user` and `school_membership`. Under multi-school that becomes cross-tenant readable data. Two answers are documented — row-level security keyed to a session variable, or a separate master-only connection. Decide it when phase D3 activates; do not build it now.
