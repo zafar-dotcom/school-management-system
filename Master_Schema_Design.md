@@ -533,7 +533,7 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
         builder.Property(x => x.TimeZone).HasMaxLength(64).IsRequired();
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
 
-        builder.UseXminAsConcurrencyToken();
+        builder.UseXminConcurrencyToken();   // local helper; Npgsql removed its own in EF Core 10
 
         builder.HasIndex(x => new { x.SchoolId, x.Code }).IsUnique();
         builder.HasAlternateKey(x => new { x.Id, x.SchoolId });   // target of the composite FK
@@ -646,7 +646,7 @@ The setup wizard writes, in one transaction:
 4. `school_membership` — that user, that school, `role = 'school_admin'`, `branch_scope = 'all_branches'`, `status = 'active'`.
 5. `license` — the signed file supplied at install.
 
-### Development and test seed — one school, **two** branches
+### Development and test seed — one school, **one** branch
 
 **Decision: development and test environments seed one school with one branch**, matching production exactly. No extra school and no extra branch is created anywhere.
 

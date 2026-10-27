@@ -726,7 +726,7 @@ These are cheap to establish before feature work and expensive to retrofit after
 
 **Audit trail.** The system records grades, attendance, and money. Every change to a tracked entity records who changed it, when, in which school and branch, and what changed. Implemented once as an EF Core `SaveChanges` interceptor so no module has to remember. Platform-administrator actions are audited in the `master` schema separately.
 
-**Optimistic concurrency.** All editable entities use PostgreSQL's `xmin` system column as the concurrency token, configured once with Npgsql's `UseXminAsConcurrencyToken`. No explicit version column is needed. Two teachers editing one grade sheet, or a payment posted twice, must produce a clear conflict rather than a silent overwrite.
+**Optimistic concurrency.** All editable entities use PostgreSQL's `xmin` system column as the concurrency token, configured once through our `UseXminConcurrencyToken()` helper in `ModelBuilderExtensions` — Npgsql's own `UseXminAsConcurrencyToken` was removed in the EF Core 10 provider. No explicit version column is needed. Two teachers editing one grade sheet, or a payment posted twice, must produce a clear conflict rather than a silent overwrite.
 
 **Dates and times.** Stored as `timestamptz` in UTC. Npgsql requires `DateTime` values mapped to `timestamptz` to be UTC-kind and throws otherwise, so the database layer enforces this decision rather than relying on discipline — a useful property, not an inconvenience to work around. Displayed in the time zone of the branch, which is a required field on every branch. Attendance, timetables, and examination schedules are date-critical, and this is not changeable later without a data migration.
 

@@ -189,9 +189,9 @@ Nothing below has been started.
 - Any test, of any kind — both test projects are empty
 - All feature modules: academic setup, teachers, students, attendance, fees, exams, reports
 
-### Housekeeping gap
+### Housekeeping
 
-**There is no version control.** The project is not a git repository and has no `.gitignore`. There is now real code with no history and no backup. This should be fixed before the next work session — see section 7.
+Version control is in place — see section 7B. No gap outstanding here.
 
 ---
 
