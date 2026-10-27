@@ -309,64 +309,75 @@ Observed through the session; worth honouring.
 
 ## 12. Exactly where to resume
 
-### Nothing is outstanding — start straight on the work below
+### Done, so nobody redoes it
 
-**A. ~~Rotate the database passwords~~ — done.** Both roles were rotated, the secrets re-set under their new names, and the originals scrubbed from `db/01_create_database_and_roles.sql`. `PROJECT_STATUS.md` §7A has the commands for any future rotation.
-
-**B. ~~Put the project under version control~~ — done.** The repository is live at `https://github.com/zafar-dotcom/school-management-system` (private), branch `main`, first commit pushed.
-
-Verified before pushing: 131 files committed, `bin/` and `obj/` excluded, no real password anywhere, and only `secrets.example.json` — the placeholder template — included. Real credentials live in user secrets outside the project folder.
-
-**Before every future commit**, run section 8 of `HOW_TO_VERIFY.md` — the scan for passwords in the project folder. Removing a secret after it has been pushed is painful.
-
-**C. ~~Make the application start~~ — done, 27 October 2026.** All six steps are built and
-were verified by running the application against the live database: the startup schema gate,
-the setup wizard, login, the branch-filtered class list, server-set `BranchId`, and
-membership revocation. `PROJECT_STATUS.md` §4 records exactly what was proved and how.
+| Item | Status |
+|---|---|
+| Architecture and `master` schema design | Closed, Revisions 1–9 |
+| Database, both schemas, two-role model | Built, verified against the running server |
+| Database passwords rotated, originals scrubbed | Done |
+| Version control | Done. Private repo, branch `main` |
+| **Walking skeleton** — `IClock`, `ITenantContext`, DI, shared connection and transaction, startup schema check, Identity with cookies, setup wizard, login, branch-filtered class list | Done, verified by running it |
+| **DPAPI-protected data-protection keys** | Done, gated on `SingleTenant` |
+| **Cross-schema FK `class.branch_id` → `master.branch`** | Done, and verified to reject an invalid branch |
+| **Use cases extracted into `SMS.Application`** | Done. Controllers are thin |
+| **`SMS.Api`** — JWT, same handlers in-process | Done, exercised end to end |
+| **Central package management, warnings-as-errors** | Done, the gate verified by compiling a deliberate warning |
+| **Five decisions closed** — market, language, academic calendar, branding, accessibility | Done, §4 rows 16–19 |
 
 Run it with:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = "Development"
-dotnet run --project src/SMS.Web
+dotnet run --project src/SMS.Web     # https://localhost:7106
+dotnet run --project src/SMS.Api     # https://localhost:7286
 ```
 
-User secrets load only in Development — without that variable you get
-"ConnectionStrings:App is not configured".
+User secrets load **only** in Development — without that variable you get
+"ConnectionStrings:App is not configured", which reads like a database fault and is not.
 
-### Then: the tests that do not exist yet
+### Pending, in order. `PROJECT_STATUS.md` §5 has sizes and detail
 
-This now comes before feature work. Everything above was verified once, by hand, and nothing
-stops it regressing — and these are the behaviours architecture §10 requires tests for.
-`PROJECT_STATUS.md` §7D lists the four.
+1. **Automated tests.** Both test projects are empty. Everything above was verified by hand exactly once and nothing stops it regressing. §7D lists the four that matter.
+2. **`master.school_branding` migration.** Designed in `Master_Schema_Design.md` §3.11. Cheapest now, while the table has one dev row and no production rows.
+3. **Academic setup module.** Nothing blocks it. The `academic_year` table shape is in `PROJECT_STATUS.md` §7F.
+4. **UI design and the theme set**, alongside module 3.
+5. **Audit log capture** — field-level changes into `master.audit_log`.
+6. **Licence enforcement**, then the `installation` row, then the generator tool.
+7. **Installer and packaging.**
+8. **The remaining six feature modules.**
 
-### The user interface is deliberately unstyled until then
+### The first feature module
 
-The screens are stock Bootstrap with no design applied. That is a decision, not an
-oversight: the class list exists to prove the branch filter and prints a raw branch GUID to
-do it. Design work waits for academic setup, when there are four or five screens that
-resemble the real product — and for the two open decisions it depends on, target market and
-visual/accessibility requirements (architecture §12).
+**Academic setup** — academic year, class, section, subject. First because everything else
+references it, it is small, and it extends the `class` table the skeleton already uses.
 
-**Eleven constraints are recorded in `PROJECT_STATUS.md` §7G** and need reading before any
-UI work starts. The ones most likely to be forgotten: **no CDN — every asset local**,
-because a school server may have no internet; **printing is a first-class requirement**,
-because the licence read-only state preserves it; and **the maintenance page must stay
-dependency-free**, because it renders when the database is unreachable.
-
-### Then: the first feature module
-
-**Academic setup** — academic year, class, section, subject. It is first because everything else references it, it is small, and it extends the `class` table that already exists.
-
-Module order, fixed in architecture §9.1:
+Order fixed in architecture §9.1:
 
 ```
 academic setup → teachers → students → attendance → fees → exams → reports
 ```
 
-Teachers before students because it is smaller and is the first module to exercise the login-to-person link across schemas. Attendance before fees because fees involves money and carries the most unanswered questions.
+Teachers before students because it is smaller and is the first module to exercise the
+login-to-person link across schemas. Attendance before fees because fees involves money and
+carries the most unanswered questions.
 
 **Do not design all seven modules up front.** Design each one just before building it.
+
+### The interface is deliberately unstyled until module 3
+
+Stock Bootstrap, no design applied. That is a decision: the class list exists to prove the
+branch filter and prints a raw branch GUID to do it. **Remove that column and the note under
+the form when the screen becomes real.**
+
+The decisions it was waiting on are now closed — English only, per-school logo with a fixed
+theme set, WCAG 2.1 AA. What remains is the work itself, plus **thirteen constraints in
+`PROJECT_STATUS.md` §7G** that must be read before any UI work starts. The three most
+easily forgotten:
+
+- **No CDN. Every asset local** — a school server may have no internet, and a stylesheet that 404s offline takes the layout with it.
+- **Printing is a first-class requirement** — the licence read-only state explicitly preserves view, search, print and export.
+- **The maintenance page must stay dependency-free** — it renders precisely when the schema is wrong or the database is unreachable.
 
 ---
 
@@ -389,3 +400,45 @@ None of these block the next work.
 **Closed 27 October 2026:** target market is **Pakistan** (so PKR, `Asia/Karachi`, `dd/MM/yyyy`); interface is **English only**; **each school sets its own logo and colours**; accessibility target is **WCAG 2.1 AA**. Architecture §12 carries the consequences, including the branding-versus-contrast conflict that has to be resolved before the branding columns are designed.
 
 One gap recorded for the future, **not a problem with one school**: every tenant role can read all of `master`, including `app_user` and `school_membership`. Under multi-school that becomes cross-tenant readable data. Two answers are documented — row-level security keyed to a session variable, or a separate master-only connection. Decide it when phase D3 activates; do not build it now.
+
+---
+
+## 14. Decided for the future — designed, not built
+
+These are **closed decisions with no code behind them yet**. A new session should implement
+them as written rather than re-deciding, and should not treat their absence as an oversight.
+
+| Area | What was decided | Where the detail is |
+|---|---|---|
+| **Academic year** | The School Admin creates them from a screen. The product assumes **no calendar**. April–March, August–May, September–June and January–December are offered as form presets only — not stored, not enforced | `PROJECT_STATUS.md` §7F, with the table shape |
+| **Date columns** | Session dates, term dates and date of birth are **`date`**, not `timestamptz` — a deliberate exception to architecture §8. Stored as `timestamptz`, 1 April in `Asia/Karachi` renders as 31 March anywhere formatting in UTC. Attendance timestamps stay `timestamptz` | `PROJECT_STATUS.md` §7F |
+| **Overlapping sessions** | Prevented by a PostgreSQL exclusion constraint on `daterange`, not a form validator. No extension needed | `PROJECT_STATUS.md` §7F |
+| **Branding** | A fixed set of pre-validated themes plus a free-form per-school logo. A new `master.school_branding` table — separate from `school`, because `school` is read on every request and a `bytea` column there would ride along | `Master_Schema_Design.md` §3.11 |
+| **Logo storage** | **In the database**, not on disk. Backup and restore stay one operation, which matters when the customer owns the machine; and it avoids the predictable-file-path tenancy surface | `Master_Schema_Design.md` §3.11 |
+| **Logo formats** | PNG and JPEG only. **SVG rejected** — it is a document that can carry script, inert in an `<img>` tag only until somebody inlines it to recolour it | `Master_Schema_Design.md` §3.11 |
+| **Accessibility** | WCAG 2.1 AA, designed in from the first screen. Bootstrap does not reach it unaided — the current scaffold uses `.text-muted` on white and the default `btn-primary`, both of which need replacing | `PROJECT_STATUS.md` §7G |
+| **Branch-scoped tables** | **Every one added from now on needs its own cross-schema foreign key to `master.branch`**, written by hand with `migrationBuilder.Sql`. EF cannot generate it across two contexts | `PROJECT_STATUS.md` §7C2 |
+| **Licence** | Yearly. Warning → grace → read-only, never a lockout. Signature is the only truth; every other column is a decoded cache. Installation key and clock high-water mark defeat casual evasion | `Master_Schema_Design.md` §3.6–3.8, handover §7 |
+| **Module boundaries** | Folders inside the layers — `SMS.Application/Students/` — never per-module class libraries. Confirmed against a company project whose Business project holds 550 files across 34 feature folders and still has not split | Architecture §11 |
+| **Two hosts** | `SMS.Web` and `SMS.Api` are siblings over `SMS.Application`, both in-process. **`SMS.Web` must never call `SMS.Api` over HTTP** | Architecture §11; the rule is also in both `.csproj` files |
+| **Deployment mode** | Read only at the host edge, never in domain or application logic. Grepping `SMS.Domain` and `SMS.Application` for it must return nothing | Architecture §7.2 |
+
+### Deferred phases, with their triggers
+
+Each is **additive** provided §6 of this document was honoured. None needs version 1's data
+model revisited. Architecture §9.2 has the activation steps.
+
+| Phase | Trigger |
+|---|---|
+| **D1 — LAN access (Model B)** | A school with more than one office. Mostly configuration and installer work |
+| **D2 — Multiple branches** | A school opens a second campus. **First task: test the branch filter with two branches**, before any branch UI |
+| **D3 — Multiple schools** | A second school on one install, or the first hosted customer. Brings `SET ROLE` switching, tenant provisioning, and the `master` readability gap above |
+| **D4 — Cloud hosting (Model C)** | A customer who will not host it themselves. Needs the provider decision, and subscriptions replace the offline licence |
+| **D5 — WPF desktop client** | A concrete desktop requirement. **The API it needs already exists** — this is now a client, not a server, project |
+
+### Still genuinely undecided
+
+Listed in §13 above. The ones that will bite soonest: **the licence file format** (blocks the
+installer), **attendance daily or period-wise** (shapes that whole module), and
+**Pakistan's data-protection position for records about minors** — marked VERIFY, deliberately
+not assumed to mirror GDPR.

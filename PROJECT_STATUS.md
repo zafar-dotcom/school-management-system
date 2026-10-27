@@ -30,6 +30,50 @@ Still missing: any automated test, licence enforcement, the installer, and every
 
 ---
 
+## 1b. Session log — what each working session delivered
+
+Kept so a new session can see the shape of the work without reading every section.
+
+### Session 1 — architecture and the data layer (26–27 October 2026)
+
+- Architecture reviewed and revised to Revision 7; every version-1 decision closed
+- `master` schema designed in full
+- Six-project .NET 10 solution, compiling clean
+- Both schemas created by EF Core migrations on a local PostgreSQL 18
+- Two-role permission model verified against the running database
+- Database passwords rotated; project put under version control
+
+### Session 2 — the walking skeleton, then two hosts (27 October 2026)
+
+**Built**
+
+| | What |
+|---|---|
+| Walking skeleton | `IClock`, `TenantContext`, DI wiring with a shared connection and transaction, `CrossSchemaTransaction`, the startup schema check, Identity with cookie auth, the setup wizard, login, and the branch-filtered class list |
+| Two decided items | DPAPI-protected data-protection keys, gated on `SingleTenant`; the cross-schema foreign key `class.branch_id` → `master.branch`, written by hand because EF cannot see across two contexts |
+| Application layer | Use cases extracted out of the controllers into `SMS.Application` — `AuthenticateHandler`, `ResolveTenantHandler`, `BuildClaimSetHandler`, `IdentityPolicy`, `CompleteSetupHandler`, `ListClassesHandler`, `CreateClassHandler`, plus the four store contracts |
+| `SMS.Api` | JWT bearer host with `/health`, `/auth/token`, `GET /classes`, `POST /classes` — calling the same handlers in-process |
+| Build configuration | `Directory.Packages.props` (central package management) and `Directory.Build.props` (shared settings, warnings-as-errors), plus layering rules written into every `.csproj` |
+| Documentation | `SETUP_NEW_MACHINE.md` created; all five existing documents brought current |
+
+**Decided** — market **Pakistan**; interface **English only**; academic years **admin-created,
+no calendar assumed**; branding **fixed pre-validated themes plus a free-form logo**;
+accessibility **WCAG 2.1 AA**. Architecture Revision 9 carries the consequences. The
+handover §14 lists everything decided-but-not-built in one table.
+
+**Three faults found, all of which had been failing silently**
+
+1. `ConnectionStrings:App` held an unquoted password containing a semicolon, so Npgsql could not parse it at all. Nothing had ever connected as the application role, so it had never surfaced.
+2. The pre-commit password scan in `HOW_TO_VERIFY.md` §8 passed `-Include` and `-Recurse` to `Select-String`, which has neither. It threw and reported "clean" without looking.
+3. Nothing updated `school.schema_version` after setup, so the first migration shipped to a customer would have bricked the install until someone edited the row by hand.
+
+**Verified by running it**, not by reasoning: server-set `BranchId` on both hosts, the branch
+filter excluding a foreign `branch_id`, the new foreign key rejecting an invalid one,
+membership revocation refusing both a stale cookie and a stale token, and the warnings-as-errors
+gate failing a build on a deliberate CS0169.
+
+---
+
 ## 2. Environment
 
 | Thing | Value |
@@ -294,7 +338,7 @@ package management. All built and exercised — see section 4.
 | 1 | **Automated tests** | 2–3 days | **The largest gap by far.** Both test projects are empty. Everything in section 4 was verified by hand exactly once; nothing stops it regressing. The four that matter are listed in §7D |
 | 2 | `master.school_branding` migration | 2 hours | Designed in `Master_Schema_Design.md` §3.11 and decided. Cheapest to add now, while the table has one dev row and no production rows |
 | 3 | **Academic setup module** | 1–2 weeks | Academic year, class, section, subject. §7F has the `academic_year` table shape. Nothing blocks it |
-| 4 | UI design and theme set | 0.5–3 days | Alongside module 3. Eleven constraints in §7G; four or five themes with measured contrast ratios |
+| 4 | UI design and theme set | 0.5–3 days | Alongside module 3. Thirteen constraints in §7G; four or five themes with measured contrast ratios |
 | 5 | Audit log capture | 2–3 days | `AuditingInterceptor` stamps who and when on the row; it does not yet write field-level changes into `master.audit_log`. Due with the first feature module |
 | 6 | Licence enforcement | 1 week | Signature check at startup and daily, the four states, clock-tamper detection, offline renewal by importing a file. Blocked on the licence file format being decided |
 | 7 | `installation` row and clock high-water mark | 1 day | Table exists, nothing writes it. Needed before licensing can work |
@@ -659,7 +703,7 @@ Two things to settle at the same time:
 explanatory note under the form. Both are scaffolding that proved a point and should not
 ship.
 
-#### Constraints to design within — the product runs in a browser on the school's own machine
+#### Thirteen constraints to design within — the product runs in a browser on the school's own machine
 
 These follow from Model A and are not negotiable later without rework.
 
@@ -733,4 +777,15 @@ Full list in architecture document section 12.
 | Pakistan's data-protection position for records about minors | Writing any retention or consent rule. **Verify it; do not assume it mirrors GDPR** |
 
 **Closed 27 October 2026:** target market **Pakistan** (PKR, 2 decimals, `Asia/Karachi`,
-`dd/MM/yyyy`); **English only**; **per-school logo and colours**; **WCAG 2.1 AA**.
+`dd/MM/yyyy`); **English only**; **per-school logo and colours**; **WCAG 2.1 AA**; and the
+academic year is **admin-created with no calendar assumed**.
+
+### Decided but not yet built
+
+A separate category, and the one most easily mistaken for an oversight. `SESSION_HANDOVER.md`
+§14 lists all twelve in one table with pointers — the academic-year table shape, the
+`date`-not-`timestamptz` rule, the overlap exclusion constraint, the branding table, logo
+storage and formats, the per-branch-table foreign key obligation, the licence lifecycle,
+module boundaries, the two-host rule, and where deployment mode may be read.
+
+**Implement these as written rather than re-deciding them.**

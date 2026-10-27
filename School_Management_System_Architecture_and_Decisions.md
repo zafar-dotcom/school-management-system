@@ -11,7 +11,7 @@
 - **Academic years are created by the School Admin from a screen.** The product assumes no calendar at all. Pakistani schools run April–March, August–May, September–June or January–December depending on the board, so a hardcoded start month would have been wrong for many customers and uncorrectable without a migration. The four patterns are offered as form presets only (`PROJECT_STATUS.md` §7F).
 - **Accessibility target is WCAG 2.1 AA**, designed in from the first screen rather than audited in later.
 - **Each school sets its own logo and chooses from a fixed set of pre-validated themes.** Free colour choice and an AA commitment cannot both hold — a pale primary produces text that fails contrast — so the themes are validated once, by us. A new `master.school_branding` table is designed in `Master_Schema_Design.md` §3.11 and not yet built.
-- UI work stays deferred to the academic-setup module, with eleven constraints that follow from running in a browser on the school's own machine recorded in `PROJECT_STATUS.md` §7G.
+- UI work stays deferred to the academic-setup module, with thirteen constraints that follow from running in a browser on the school's own machine recorded in `PROJECT_STATUS.md` §7G.
 
 **Revision 8 — API and module structure**
 
