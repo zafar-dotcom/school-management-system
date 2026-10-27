@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SMS.Application/SMS.Application.csproj" />
+    <Project Path="src/SMS.Domain/SMS.Domain.csproj" />
+    <Project Path="src/SMS.Infrastructure/SMS.Infrastructure.csproj" />
+    <Project Path="src/SMS.Web/SMS.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SMS.IntegrationTests/SMS.IntegrationTests.csproj" />
+    <Project Path="tests/SMS.UnitTests/SMS.UnitTests.csproj" />
+  </Folder>
+</Solution>
