@@ -4,7 +4,13 @@
 **Covers:** roadmap step 1 — "Define what belongs in the `master` schema" — and step 3's model.
 **Companion:** `PROJECT_STATUS.md` tracks what is actually built against this design.
 **Scope:** the `master` schema only. The school schema (`school_main`) is designed separately, alongside the first feature modules.
-**Status:** draft for review. Verified against the single-school (Model A) scope — see Section 9. Items needing confirmation are in Section 8.
+**Status:** built, except `school_branding` (§3.11), which is designed and decided but has no
+migration yet. Verified against the single-school (Model A) scope — see Section 9. Items
+needing confirmation are in Section 8.
+
+**Last reviewed:** 27 October 2026. Twelve of the thirteen `master` tables exist in the
+database; `data_protection_key` was added by migration `20261027081215_AddDataProtectionKeys`.
+The setup wizard writes four of the six seed rows — see Section 7 for which, and why.
 
 ---
 
@@ -44,8 +50,12 @@ master
 ├── installation                this install: key, version, clock watermark
 ├── license                     yearly subscription, with renewal history
 ├── audit_log                   platform-level audit trail
-└── data_protection_key         ASP.NET Core key ring
+├── data_protection_key         ASP.NET Core key ring
+└── school_branding             theme and logo, one row per school — NOT YET BUILT (§3.11)
 ```
+
+**Twelve of these thirteen exist.** `school_branding` is designed in §3.11 and decided, but
+has no migration yet — `PROJECT_STATUS.md` §7G.
 
 **No Identity role tables.** `asp_net_roles` and `asp_net_user_roles` are deliberately absent. Derive the context from `IdentityUserContext<,>` rather than `IdentityDbContext<,>` so they are never created — this makes "authorization does not come from Identity roles" (architecture §5.2) a structural fact rather than a rule someone has to remember.
 
@@ -422,6 +432,48 @@ CREATE TABLE master.data_protection_key (
 
 Shape fixed by `Microsoft.AspNetCore.DataProtection.EntityFrameworkCore`. On a single machine the filesystem key ring would work, but persisting keys here from day one means authentication cookies survive a reinstall, and the multi-instance requirement in architecture §8 is already satisfied when it matters. Four columns, no downside.
 
+**Built.** Migration `20261027081215_AddDataProtectionKeys`. The keys are encrypted with
+DPAPI in `SingleTenant` mode — unencrypted rows here would let anyone who can read this
+table, or a backup of it, forge an authentication cookie. Consequence to record in the
+support notes: restoring a backup onto a *different* machine makes existing cookies
+unreadable, so everyone signs in again once. That is expected, not a fault.
+
+### 3.11 `school_branding` — designed, not yet built
+
+Decided 27 October 2026: each school sets its own logo and chooses from a fixed set of
+pre-validated themes. Full reasoning in `PROJECT_STATUS.md` §7G.
+
+```sql
+CREATE TABLE master.school_branding (
+    school_id          uuid         NOT NULL,
+    theme              varchar(30)  NOT NULL DEFAULT 'default',
+    logo_content       bytea        NULL,
+    logo_content_type  varchar(100) NULL,
+    logo_updated_at    timestamptz  NULL,
+    created_at         timestamptz  NOT NULL,
+    created_by         uuid         NULL,
+    updated_at         timestamptz  NULL,
+    updated_by         uuid         NULL,
+
+    CONSTRAINT pk_school_branding        PRIMARY KEY (school_id),
+    CONSTRAINT fk_school_branding_school FOREIGN KEY (school_id)
+                                         REFERENCES master.school (id) ON DELETE CASCADE,
+    CONSTRAINT ck_school_branding_theme  CHECK (theme IN ('default')),   -- extend as themes are published
+    CONSTRAINT ck_school_branding_logo   CHECK ((logo_content IS NULL) = (logo_content_type IS NULL)),
+    CONSTRAINT ck_school_branding_type   CHECK (logo_content_type IS NULL
+                                                OR logo_content_type IN ('image/png','image/jpeg'))
+);
+```
+
+Notes:
+
+- **A separate table, not columns on `school`.** `master.school` is read during tenant resolution on *every request*. A `bytea` column on that entity is one careless `Include` away from loading a logo on every page view. Branding is fetched deliberately and is a good candidate for caching.
+- **`ON DELETE CASCADE`**, unlike most foreign keys here: branding is owned entirely by its school and has no meaning without it. Schools are closed by status rather than deleted, so this rarely fires.
+- **PNG and JPEG only, enforced by a check constraint.** SVG is deliberately excluded: it is a document that can carry script, inert inside an `<img>` tag only until somebody inlines it to recolour it. Refusing the format is cheaper than remembering the rule. Cap the upload size in the application — a few hundred KB is generous for a logo.
+- **`theme` is `varchar` + `CHECK`**, consistent with every other enumeration here (§1). Publishing a new theme is a one-line migration.
+- **Why the logo is in the database, not on disk:** backup and restore stay a single operation on one database, which matters when the customer owns the machine and will not run a second backup job; and it avoids the predictable-file-path tenancy surface that architecture §8 warns about. Revisit if schools ever upload large assets.
+- **Row creation:** write the row at setup with the default theme and no logo, so later code never has to handle "branding missing".
+
 ---
 
 ## 4. EF entities
@@ -645,6 +697,13 @@ The setup wizard writes, in one transaction:
 3. `app_user` — the first administrator.
 4. `school_membership` — that user, that school, `role = 'school_admin'`, `branch_scope = 'all_branches'`, `status = 'active'`.
 5. `license` — the signed file supplied at install.
+6. `school_branding` — default theme, no logo, once §3.11 is built.
+
+**As built, the wizard writes rows 1 to 4 only.** The `license` row is not written: the
+licence file format and the signing tool do not exist yet, so there would be nothing to
+validate it against, and a row nothing verifies is worse than no row. Entitlement is
+therefore unenforced — `PROJECT_STATUS.md` §5. Rows 5 and 6 are added when the licence
+work and the branding migration land.
 
 ### Development and test seed — one school, **one** branch
 

@@ -10,7 +10,7 @@ This is the living progress document. The others change rarely:
 | Document | What it is |
 |---|---|
 | `SESSION_HANDOVER.md` | The whole picture, decisions and what reversed. Read first in a new session. |
-| `School_Management_System_Architecture_and_Decisions.md` | Decisions and why. Revision 8. |
+| `School_Management_System_Architecture_and_Decisions.md` | Decisions and why. Revision 9. |
 | `Master_Schema_Design.md` | The `master` schema design and its reasoning. |
 | `HOW_TO_VERIFY.md` | How to check anything is correct — connections, migrations, permissions, tables. |
 | **`PROJECT_STATUS.md`** (this file) | Current state and next actions. |

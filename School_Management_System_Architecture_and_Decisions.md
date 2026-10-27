@@ -4,6 +4,15 @@
 
 **Companion documents:** `SESSION_HANDOVER.md` — read first in a new session. `PROJECT_STATUS.md` — what is built, verified and outstanding right now. `Master_Schema_Design.md` — the `master` schema design.
 
+**Revision 9 — market, language, academic calendar, branding and accessibility**
+
+- **Target market is Pakistan.** `Asia/Karachi` in the setup wizard is a real default now, not a placeholder. PKR with 2 decimal places, `dd/MM/yyyy` (Section 12).
+- **The interface is English only**, and expected to stay so. Strings are hardcoded; no resource files. The consequence of ever reversing this — every view, validation message and email template — is recorded rather than assumed away (Section 12).
+- **Academic years are created by the School Admin from a screen.** The product assumes no calendar at all. Pakistani schools run April–March, August–May, September–June or January–December depending on the board, so a hardcoded start month would have been wrong for many customers and uncorrectable without a migration. The four patterns are offered as form presets only (`PROJECT_STATUS.md` §7F).
+- **Accessibility target is WCAG 2.1 AA**, designed in from the first screen rather than audited in later.
+- **Each school sets its own logo and chooses from a fixed set of pre-validated themes.** Free colour choice and an AA commitment cannot both hold — a pale primary produces text that fails contrast — so the themes are validated once, by us. A new `master.school_branding` table is designed in `Master_Schema_Design.md` §3.11 and not yet built.
+- UI work stays deferred to the academic-setup module, with eleven constraints that follow from running in a browser on the school's own machine recorded in `PROJECT_STATUS.md` §7G.
+
 **Revision 8 — API and module structure**
 
 - **`SMS.Api` is built now, alongside `SMS.Web`**, not deferred to phase D5. A mobile client is planned in addition to WPF, so the API is known work rather than speculation; and a second consumer enforces the layering structurally (Section 11).
@@ -172,6 +181,11 @@ Treat Section 1.3 as a constraint on version 1, not as optional polish.
 | Expiry behaviour | 30-day warning → 14-day grace → **read-only**. Never a lockout, never data loss (`Master_Schema_Design.md` §3.8) |
 | Hosting | Provider-independent application logic; cloud provider not yet selected |
 | Future hosting options | Azure, AWS, or a VPS, after cost and operational comparison |
+| Target market | **Pakistan.** PKR with 2 decimals, `Asia/Karachi`, `dd/MM/yyyy` (Revision 9) |
+| Interface language | **English only**, hardcoded. No resource files (Revision 9) |
+| Academic year | **Created by the School Admin from a screen.** The product assumes no calendar (Revision 9) |
+| Branding | **Fixed set of pre-validated themes, plus a free-form per-school logo** (Revision 9) |
+| Accessibility | **WCAG 2.1 AA**, designed in from the first screen (Revision 9) |
 
 ### Important authentication clarification
 
@@ -814,7 +828,7 @@ These are cheap to establish before feature work and expensive to retrofit after
 
 | # | Module | Needs | Decide before starting |
 |---|---|---|---|
-| 6 | Academic setup | Foundation only | ✅ Nothing — decided: academic year is school-wide (§4.4) |
+| 6 | Academic setup | Foundation only | ✅ Nothing. Academic year is school-wide (§4.4) and is created by the School Admin from a screen — no calendar is assumed (Revision 9) |
 | 7 | Teachers and staff | 6 | Staff types; what happens when staff leave; the user-account link (§4.7) |
 | 8 | Students and parents | 6 | Student record structure (§4.4); admission number format and rules |
 | 9 | Attendance | 6, 7, 8 | **Daily or period-wise?** This shapes the whole table design |

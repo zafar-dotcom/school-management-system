@@ -115,9 +115,52 @@ Then, at the `sms=>` prompt:
 \q                    -- quit
 ```
 
-**Expected:** 12 tables in `master`, 2 in `school_main` (including each schema's `__ef_migrations_history`).
+**Expected:** 13 tables in `master`, 2 in `school_main` (including each schema's `__ef_migrations_history`).
+
+Counting them without opening psql:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U role_school_main -d sms -t -A `
+  -c "SELECT table_schema, count(*) FROM information_schema.tables WHERE table_schema IN ('master','school_main') GROUP BY table_schema ORDER BY 1;"
+```
+
+> The count changes whenever a migration adds a table — it went from 12 to 13 when
+> `data_protection_key` arrived. If it disagrees with this document, check which is wrong
+> before assuming the database is.
 
 Or in pgAdmin: expand **sms → Schemas → master → Tables**.
+
+---
+
+## 4b. Is the cross-schema foreign key in place?
+
+This one is easy to lose: EF cannot generate it, so it exists only because a migration
+writes it by hand. If someone rebuilds the school schema without that migration, nothing
+fails loudly — rows just start accepting branch ids that do not exist.
+
+```sql
+SELECT conname, pg_get_constraintdef(oid)
+FROM   pg_constraint
+WHERE  conname = 'fk_class_branch';
+```
+
+| Result | Meaning |
+|---|---|
+| `FOREIGN KEY (branch_id) REFERENCES master.branch(id) ON DELETE RESTRICT` | ✅ Correct |
+| No rows | ❌ The migration has not been applied, or the constraint was dropped |
+
+Prove it actually bites, as the application role:
+
+```sql
+INSERT INTO school_main.class (id, branch_id, code, name, sort_order, created_at)
+VALUES (gen_random_uuid(), '00000000-0000-0000-0000-0000000000bb', 'XX', 'Should fail', 99, now());
+```
+
+**Expect:** `violates foreign key constraint "fk_class_branch"`. If it succeeds, delete the
+row and find out why the constraint is missing.
+
+**Every branch-scoped table added from now on needs the same constraint** — architecture
+§4.3 and §4.7, and `PROJECT_STATUS.md` §7C2.
 
 ---
 
@@ -153,7 +196,46 @@ A failure here is not a bug to shrug at — it means a bug in application code c
 dotnet build
 ```
 
-Expect `Build succeeded` with **0 Warning(s)** and **0 Error(s)**. Warnings are treated as something to fix, not background noise.
+Expect `Build succeeded` with **0 Warning(s)** and **0 Error(s)**.
+
+Zero warnings is now **enforced**, not a convention: `TreatWarningsAsErrors` is set in
+`Directory.Build.props`, so a warning fails the build. The one exception is NuGet audit
+(`NU19xx`), which stays a warning so a newly published advisory cannot block an unrelated
+hotfix — but treat one appearing as work to schedule immediately.
+
+If a build fails with **MSB3027 / "being used by another process"**, a host is still
+running and holding `bin\`. `Stop-Process -Name dotnet` does not catch it — the process is
+named after the project:
+
+```powershell
+Get-Process SMS.Web,SMS.Api -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+---
+
+## 6b. Do both hosts actually start and serve?
+
+There are two hosts over one application layer. Both run the same startup schema check, so
+a problem usually shows up in both.
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"   # user secrets load ONLY in Development
+dotnet run --project src/SMS.Web              # https://localhost:7106
+dotnet run --project src/SMS.Api              # https://localhost:7286
+```
+
+| Check | Expected |
+|---|---|
+| Startup log | `Schema check passed. School '...' at version <migration id>` |
+| `GET https://localhost:7286/health` | `{"status":"Ready","ready":true,"detail":null}` |
+| `GET https://localhost:7286/classes` with no token | `401` |
+| Web root in a browser | Sign-in prompt, or a redirect to `/Setup` on an empty database |
+
+| Startup problem | Meaning |
+|---|---|
+| `ConnectionStrings:App is not configured` | `ASPNETCORE_ENVIRONMENT` is not `Development`, so user secrets were not loaded |
+| A 503 maintenance page on every request | The schema check refused — read the page, it states the reason |
+| `No Jwt:SigningKey configured` warning (API) | Expected in Development. Outside it, the API refuses to start at all |
 
 ---
 
@@ -261,8 +343,11 @@ Select-String -Path "C:\Program Files\PostgreSQL\18\data\pg_hba.conf" -Pattern "
 | Am I on my own server? | `SELECT inet_server_addr();` → must be `::1` |
 | Does my connection work? | `dotnet ef migrations list ... --context MasterDbContext` |
 | Anything unapplied? | Same command — look for `(Pending)` |
-| What tables exist? | `\dt master.*` in psql |
+| What tables exist? | `\dt master.*` in psql → 13 in `master`, 2 in `school_main` |
+| Is the cross-schema FK there? | `SELECT conname FROM pg_constraint WHERE conname = 'fk_class_branch';` |
 | Are role permissions right? | `CREATE TABLE master.hack(x int);` as `role_school_main` → must fail |
-| Does it build? | `dotnet build` |
+| Does it build? | `dotnet build` → warnings are errors now |
+| Is a host holding `bin\`? | `Get-Process SMS.Web,SMS.Api \| Stop-Process -Force` |
+| Is the API healthy? | `GET https://localhost:7286/health` |
 | Which secrets are set? | `dotnet user-secrets list --project src/SMS.Infrastructure` |
 | Is PostgreSQL up? | `Get-Service postgresql*` |
